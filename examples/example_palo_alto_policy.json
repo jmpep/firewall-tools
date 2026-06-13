@@ -1,0 +1,269 @@
+{
+  "policy-package": {
+    "name": "PA-Enterprise-Security-Policy",
+    "uid": "pa-policy-001",
+    "meta-info": { "fetched-at": "2026-06-13T10:00:00Z" },
+    "access-control-policy": {
+      "layers": [
+        {
+          "name": "Security Policy",
+          "uid": "pa-layer-sec-001",
+          "rules": [
+            {
+              "uid": "pa-rule-0001",
+              "rule-number": "1",
+              "name": "Allow Web Traffic to DMZ",
+              "enabled": true,
+              "source": [{"name": "Internal_Net"}],
+              "destination": [{"name": "DMZ_WebServer"}],
+              "service": [{"name": "tcp-80"}, {"name": "tcp-443"}],
+              "action": {"name": "Allow"},
+              "track": {"type": "Log at Session End"},
+              "install-on": {"name": "PA-VM"},
+              "time": {"name": "Always"},
+              "user": {"name": "Any"},
+              "comments": "Allow HTTP/HTTPS from internal users to DMZ web server",
+              "meta-info": {
+                "creation-time": {"iso": "2026-01-15T08:00:00Z"},
+                "last-modified": {"iso": "2026-06-01T14:30:00Z"}
+              },
+              "hits": {"hits": "15234"},
+              "source-zone": "Internal",
+              "destination-zone": "DMZ",
+              "application": [{"name": "web-browsing"}, {"name": "ssl"}],
+              "user": [{"name": "domain\\user1"}, {"name": "domain\\user2"}],
+              "profile": ["strict-security-profile"],
+              "log-setting": "default-logging",
+              "category": [{"name": "general-internet"}],
+              "_rule-type": "security",
+              "_policy-name": "PA-Enterprise-Security-Policy",
+              "_layer": "Security Policy"
+            },
+            {
+              "uid": "pa-rule-0002",
+              "rule-number": "2",
+              "name": "Block Malicious Traffic",
+              "enabled": true,
+              "source": [{"name": "External_Net"}],
+              "destination": [{"name": "Internal_Net"}],
+              "service": [{"name": "Any"}],
+              "action": {"name": "Deny"},
+              "track": {"type": "Log at Session Start"},
+              "install-on": {"name": "PA-VM"},
+              "time": {"name": "Always"},
+              "user": {"name": "Any"},
+              "comments": "Block known malicious sources",
+              "meta-info": {
+                "creation-time": {"iso": "2026-02-20T10:00:00Z"},
+                "last-modified": {"iso": "2026-05-15T09:00:00Z"}
+              },
+              "hits": {"hits": "8921"},
+              "source-zone": "External",
+              "destination-zone": "Internal",
+              "application": [{"name": "Any"}],
+              "user": [{"name": "Any"}],
+              "profile": ["strict-security-profile"],
+              "log-setting": "default-logging",
+              "_rule-type": "security",
+              "_policy-name": "PA-Enterprise-Security-Policy",
+              "_layer": "Security Policy"
+            },
+            {
+              "uid": "pa-rule-0003",
+              "rule-number": "3",
+              "name": "Allow DNS Queries",
+              "enabled": true,
+              "source": [{"name": "Internal_Net"}],
+              "destination": [{"name": "DNS_Servers"}],
+              "service": [{"name": "udp-53"}],
+              "action": {"name": "Allow"},
+              "track": {"type": "Log at Session End"},
+              "install-on": {"name": "PA-VM"},
+              "time": {"name": "WorkHours"},
+              "user": {"name": "Any"},
+              "comments": "Allow DNS queries to internal DNS servers during work hours",
+              "meta-info": {
+                "creation-time": {"iso": "2026-01-10T08:00:00Z"},
+                "last-modified": {"iso": "2026-03-20T11:00:00Z"}
+              },
+              "hits": {"hits": "45678"},
+              "source-zone": "Internal",
+              "destination-zone": "DMZ",
+              "application": [{"name": "dns"}],
+              "user": [{"name": "Any"}],
+              "log-setting": "default-logging",
+              "_rule-type": "security",
+              "_policy-name": "PA-Enterprise-Security-Policy",
+              "_layer": "Security Policy"
+            },
+            {
+              "uid": "pa-rule-0004",
+              "rule-number": "4",
+              "name": "Allow VPN Traffic",
+              "enabled": true,
+              "source": [{"name": "VPN_Pool"}],
+              "destination": [{"name": "Internal_Net"}],
+              "service": [{"name": "Any"}],
+              "action": {"name": "Allow"},
+              "track": {"type": "Log at Session End"},
+              "install-on": {"name": "PA-VM"},
+              "time": {"name": "Always"},
+              "user": [{"name": "domain\\vpn-users"}],
+              "comments": "Allow VPN users to access internal resources",
+              "meta-info": {
+                "creation-time": {"iso": "2026-01-01T00:00:00Z"},
+                "last-modified": {"iso": "2026-04-10T16:00:00Z"}
+              },
+              "hits": {"hits": "6721"},
+              "source-zone": "VPN",
+              "destination-zone": "Internal",
+              "application": [{"name": "Any"}],
+              "user": [{"name": "domain\\vpn-users"}],
+              "profile": ["vpn-security-profile"],
+              "log-setting": "default-logging",
+              "_rule-type": "security",
+              "_policy-name": "PA-Enterprise-Security-Policy",
+              "_layer": "Security Policy"
+            },
+            {
+              "uid": "pa-rule-0005",
+              "rule-number": "5",
+              "name": "Outbound Internet Access",
+              "enabled": true,
+              "source": [{"name": "Internal_Net"}],
+              "destination": [{"name": "External_Net"}],
+              "service": [{"name": "tcp-80"}, {"name": "tcp-443"}, {"name": "udp-53"}],
+              "action": {"name": "Allow"},
+              "track": {"type": "Log at Session End"},
+              "install-on": {"name": "PA-VM"},
+              "time": {"name": "Always"},
+              "user": {"name": "Any"},
+              "comments": "General outbound internet access for internal users",
+              "meta-info": {
+                "creation-time": {"iso": "2026-01-01T00:00:00Z"},
+                "last-modified": {"iso": "2026-06-10T08:00:00Z"}
+              },
+              "hits": {"hits": "123456"},
+              "source-zone": "Internal",
+              "destination-zone": "External",
+              "application": [{"name": "web-browsing"}, {"name": "ssl"}, {"name": "dns"}],
+              "user": [{"name": "Any"}],
+              "profile": ["url-filtering-profile"],
+              "log-setting": "default-logging",
+              "_rule-type": "security",
+              "_policy-name": "PA-Enterprise-Security-Policy",
+              "_layer": "Security Policy"
+            },
+            {
+              "uid": "pa-rule-0006",
+              "rule-number": "6",
+              "name": "Stealth Rule",
+              "enabled": true,
+              "source": [{"name": "Any"}],
+              "destination": [{"name": "PA-VM_Mgmt"}],
+              "service": [{"name": "Any"}],
+              "action": {"name": "Deny"},
+              "track": {"type": "Log at Session Start"},
+              "install-on": {"name": "PA-VM"},
+              "time": {"name": "Always"},
+              "user": {"name": "Any"},
+              "comments": "Block direct access to firewall management",
+              "_rule-type": "security",
+              "_policy-name": "PA-Enterprise-Security-Policy",
+              "_layer": "Security Policy",
+              "source-zone": "Any",
+              "destination-zone": "Internal"
+            }
+          ],
+          "inline-layers": []
+        }
+      ]
+    },
+    "nat-policy": {
+      "rules": [
+        {
+          "uid": "pa-nat-0001",
+          "rule-number": "1",
+          "name": "Source NAT for Internal",
+          "enabled": true,
+          "method": "dynamic-ip-and-port",
+          "original-source": [{"name": "Internal_Net"}],
+          "original-destination": [{"name": "External_Net"}],
+          "original-service": [{"name": "Any"}],
+          "translated-source": [{"name": "PA_Public_IP"}],
+          "translated-destination": [{"name": "Original"}],
+          "translated-service": [{"name": "Original"}],
+          "action": {"name": "translate"},
+          "install-on": {"name": "PA-VM"},
+          "comments": "Hide NAT for internal users to internet",
+          "meta-info": {
+            "creation-time": {"iso": "2026-01-01T00:00:00Z"},
+            "last-modified": {"iso": "2026-03-15T10:00:00Z"}
+          }
+        },
+        {
+          "uid": "pa-nat-0002",
+          "rule-number": "2",
+          "name": "Destination NAT for Web Server",
+          "enabled": true,
+          "method": "static",
+          "original-source": [{"name": "Any"}],
+          "original-destination": [{"name": "PA_Public_IP"}],
+          "original-service": [{"name": "tcp-80"}, {"name": "tcp-443"}],
+          "translated-source": [{"name": "Original"}],
+          "translated-destination": [{"name": "DMZ_WebServer"}],
+          "translated-service": [{"name": "Original"}],
+          "action": {"name": "translate"},
+          "install-on": {"name": "PA-VM"},
+          "comments": "Port forwarding HTTP/HTTPS to DMZ web server",
+          "meta-info": {
+            "creation-time": {"iso": "2026-01-15T08:00:00Z"},
+            "last-modified": {"iso": "2026-02-01T12:00:00Z"}
+          }
+        }
+      ]
+    }
+  },
+  "objects": {
+    "hosts": [
+      {"name": "DMZ_WebServer", "ip-address": "10.0.1.10", "type": "ip-netmask"},
+      {"name": "DNS_Server1", "ip-address": "10.0.2.10", "type": "ip-netmask"},
+      {"name": "DNS_Server2", "ip-address": "10.0.2.11", "type": "ip-netmask"},
+      {"name": "PA-VM", "ip-address": "192.168.1.1", "type": "ip-netmask"},
+      {"name": "PA_Public_IP", "ip-address": "203.0.113.1", "type": "ip-netmask"},
+      {"name": "PA-VM_Mgmt", "ip-address": "192.168.0.1", "type": "ip-netmask"}
+    ],
+    "networks": [
+      {"name": "Internal_Net", "subnet": "10.0.0.0", "mask-length": 16},
+      {"name": "DMZ_Net", "subnet": "10.0.1.0", "mask-length": 24},
+      {"name": "External_Net", "subnet": "0.0.0.0", "mask-length": 0},
+      {"name": "VPN_Pool", "subnet": "172.16.0.0", "mask-length": 24}
+    ],
+    "groups": [
+      {"name": "DNS_Servers", "members": [{"name": "DNS_Server1"}, {"name": "DNS_Server2"}]},
+      {"name": "Internal_Servers", "members": [{"name": "DMZ_WebServer"}, {"name": "DNS_Server1"}]}
+    ],
+    "services": [
+      {"name": "tcp-80", "protocol": "tcp", "port": "80"},
+      {"name": "tcp-443", "protocol": "tcp", "port": "443"},
+      {"name": "udp-53", "protocol": "udp", "port": "53"},
+      {"name": "tcp-22", "protocol": "tcp", "port": "22"},
+      {"name": "tcp-3389", "protocol": "tcp", "port": "3389"}
+    ],
+    "application-sites": [
+      {"name": "web-browsing", "category": "general-internet", "risk": "1"},
+      {"name": "ssl", "category": "tunnel", "risk": "1"},
+      {"name": "dns", "category": "infrastructure", "risk": "1"},
+      {"name": "smtp", "category": "email", "risk": "2"}
+    ],
+    "users": [
+      {"name": "domain\\user1", "type": "local"},
+      {"name": "domain\\user2", "type": "local"},
+      {"name": "domain\\vpn-users", "type": "group"}
+    ],
+    "time-objects": [
+      {"name": "WorkHours", "start-time": "08:00", "end-time": "18:00", "days": ["Mon", "Tue", "Wed", "Thu", "Fri"]}
+    ]
+  },
+  "_vendor": "paloalto"
+}

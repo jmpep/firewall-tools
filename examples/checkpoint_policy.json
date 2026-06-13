@@ -1,0 +1,1554 @@
+{
+  "policy-package": {
+    "name": "Enterprise_Security_Policy",
+    "uid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "meta-info": {
+      "creation-time": "2025-11-15T10:30:00Z",
+      "last-modifier": "admin",
+      "last-modified": "2026-03-20T14:22:00Z"
+    },
+    "access-control-policy": {
+      "layers": [
+        {
+          "name": "Network Access Layer",
+          "uid": "layer-1111-2222-3333-444444444444",
+          "shared": false,
+          "inline": false,
+          "rules": [
+            {
+              "uid": "rule-0001-0001",
+              "rule-number": 1,
+              "name": "Stealth - Protect Gateway",
+              "enabled": true,
+              "source": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "destination": [
+                { "name": "Security_Gateway", "uid": "obj-gw-main" }
+              ],
+              "service": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "action": { "name": "Drop", "uid": "action-drop" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Drop all traffic to the gateway itself from internal networks",
+              "meta-info": {
+                "creation-time": { "iso": "2025-11-15T10:30:00Z", "posix": 1736937000 },
+                "last-modifier": "admin",
+                "last-modified": { "iso": "2026-01-10T09:15:00Z", "posix": 1767352500 }
+              },
+              "hits": {
+                "hits": 42,
+                "first-date": { "iso": "2025-11-16T08:00:00Z", "posix": 1737024000 },
+                "last-date": { "iso": "2026-01-09T17:30:00Z", "posix": 1767264600 }
+              }
+            },
+            {
+              "uid": "rule-0002-0002",
+              "rule-number": 2,
+              "name": "Anti-Spoofing",
+              "enabled": true,
+              "source": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "destination": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "service": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "action": { "name": "Drop", "uid": "action-drop" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": true
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Drop traffic from external networks that claim internal source IPs"
+            },
+            {
+              "uid": "rule-0003-0003",
+              "rule-number": 3,
+              "name": "Allow DNS Queries",
+              "enabled": true,
+              "source": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "destination": [
+                { "name": "DNS_Server", "uid": "obj-host-dns" }
+              ],
+              "service": [
+                { "name": "dns", "uid": "obj-svc-dns" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": true,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow DNS resolution from internal hosts"
+            },
+            {
+              "uid": "rule-0004-0004",
+              "rule-number": 4,
+              "name": "Allow HTTP/HTTPS to Web Server",
+              "enabled": true,
+              "source": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "destination": [
+                { "name": "WebServer", "uid": "obj-host-web" }
+              ],
+              "service": [
+                { "name": "http", "uid": "obj-svc-http" },
+                { "name": "https", "uid": "obj-svc-https" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": true,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow inbound web traffic to public web server in DMZ",
+              "meta-info": {
+                "creation-time": { "iso": "2025-09-01T08:00:00Z", "posix": 1734307200 },
+                "last-modifier": "admin",
+                "last-modified": { "iso": "2026-03-15T11:45:00Z", "posix": 1767680700 }
+              },
+              "hits": {
+                "hits": 15892,
+                "first-date": { "iso": "2025-09-01T08:05:00Z", "posix": 1734307500 },
+                "last-date": { "iso": "2026-03-20T14:20:00Z", "posix": 1767788400 }
+              }
+            },
+            {
+              "uid": "rule-0005-0005",
+              "rule-number": 5,
+              "name": "Allow HTTPS to App Server",
+              "enabled": true,
+              "source": [
+                { "name": "WebServer", "uid": "obj-host-web" }
+              ],
+              "destination": [
+                { "name": "AppServer", "uid": "obj-host-app" }
+              ],
+              "service": [
+                { "name": "https", "uid": "obj-svc-https" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow web server to communicate with application server"
+            },
+            {
+              "uid": "rule-0006-0006",
+              "rule-number": 6,
+              "name": "Allow App to Database",
+              "enabled": true,
+              "source": [
+                { "name": "AppServer", "uid": "obj-host-app" }
+              ],
+              "destination": [
+                { "name": "DBServer", "uid": "obj-host-db" }
+              ],
+              "service": [
+                { "name": "mssql", "uid": "obj-svc-mssql" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": true,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow application server to query database server"
+            },
+            {
+              "uid": "rule-0007-0007",
+              "rule-number": 7,
+              "name": "Allow SSH Administration",
+              "enabled": true,
+              "source": [
+                { "name": "Admin_Net", "uid": "obj-net-admin" }
+              ],
+              "destination": [
+                { "name": "Internal_Servers", "uid": "obj-grp-servers" }
+              ],
+              "service": [
+                { "name": "ssh", "uid": "obj-svc-ssh" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Business_Hours", "uid": "obj-time-business" },
+              "user": { "name": "IT_Admins", "uid": "obj-usr-it-admins" },
+              "comments": "Allow SSH access to servers from admin network during business hours"
+            },
+            {
+              "uid": "rule-0008-0008",
+              "rule-number": 8,
+              "name": "Internal Outbound Web Access",
+              "enabled": true,
+              "source": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "destination": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "service": [
+                { "name": "http", "uid": "obj-svc-http" },
+                { "name": "https", "uid": "obj-svc-https" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": true,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "inline-layer": {
+                "name": "Content Filtering - Inline Layer",
+                "uid": "layer-inline-content"
+              },
+              "comments": "Allow internal users outbound web access with content filtering"
+            },
+            {
+              "uid": "rule-0009-0009",
+              "rule-number": 9,
+              "name": "Allow ICMP Monitoring",
+              "enabled": true,
+              "source": [
+                { "name": "Monitoring_Net", "uid": "obj-net-monitoring" }
+              ],
+              "destination": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" },
+                { "name": "DMZ_Net", "uid": "obj-net-dmz" }
+              ],
+              "service": [
+                { "name": "icmp-reply", "uid": "obj-svc-icmp-reply" },
+                { "name": "icmp-request", "uid": "obj-svc-icmp-request" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow monitoring probes to internal and DMZ networks"
+            },
+            {
+              "uid": "rule-0010-0010",
+              "rule-number": 10,
+              "name": "Allow Admin and Monitoring to Management Console",
+              "enabled": true,
+              "source": [
+                { "name": "Admin_Net", "uid": "obj-net-admin" },
+                { "name": "Monitoring_Net", "uid": "obj-net-monitoring" }
+              ],
+              "destination": [
+                { "name": "AppServer", "uid": "obj-host-app" }
+              ],
+              "service": [
+                { "name": "https", "uid": "obj-svc-https" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": true,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "IT_Admins", "uid": "obj-usr-it-admins" },
+              "comments": "Allow admin and monitoring networks to access management console"
+            },
+            {
+              "uid": "rule-0014-0014",
+              "rule-number": 11,
+              "name": "Allow Legacy FTP to Web Server (DEPRECATED)",
+              "enabled": false,
+              "source": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "destination": [
+                { "name": "WebServer", "uid": "obj-host-web" }
+              ],
+              "service": [
+                { "name": "ftp", "uid": "obj-svc-ftp" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Deprecated FTP access - disabled for security reasons"
+            },
+            {
+              "uid": "rule-0015-0015",
+              "rule-number": 12,
+              "name": "Allow All Internal Networks Outbound HTTPS",
+              "enabled": true,
+              "source": [
+                { "name": "All_Internal_Networks", "uid": "obj-grp-all-internal" }
+              ],
+              "destination": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "service": [
+                { "name": "https", "uid": "obj-svc-https" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": true,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow all internal subnets (corp, DMZ, admin, monitoring) outbound HTTPS"
+            },
+            {
+              "uid": "rule-0011-0011",
+              "rule-number": 13,
+              "name": "Allow Internal to Corporate Email and Database",
+              "enabled": true,
+              "source": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "destination": [
+                { "name": "MailServer", "uid": "obj-host-mail" },
+                { "name": "DBServer", "uid": "obj-host-db" }
+              ],
+              "service": [
+                { "name": "smtp", "uid": "obj-svc-smtp" },
+                { "name": "imap", "uid": "obj-svc-imap" },
+                { "name": "mssql", "uid": "obj-svc-mssql" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": true,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Business_Hours", "uid": "obj-time-business" },
+              "user": { "name": "Internal_Users", "uid": "obj-usr-internal" },
+              "comments": "Allow internal users to access email and database servers during business hours"
+            },
+            {
+              "uid": "rule-0012-0012",
+              "rule-number": 14,
+              "name": "Allow VPN Pool to Internal Resources",
+              "enabled": true,
+              "source": [
+                { "name": "VPN_Pool", "uid": "obj-net-vpn" },
+                { "name": "Admin_Net", "uid": "obj-net-admin" }
+              ],
+              "destination": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" },
+                { "name": "DMZ_Net", "uid": "obj-net-dmz" }
+              ],
+              "service": [
+                { "name": "https", "uid": "obj-svc-https" },
+                { "name": "ssh", "uid": "obj-svc-ssh" },
+                { "name": "rdp", "uid": "obj-svc-rdp" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": true,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow VPN users and admins to access internal and DMZ resources"
+            },
+            {
+              "uid": "rule-0013-0013",
+              "rule-number": 15,
+              "name": "Cleanup Rule - Drop All",
+              "enabled": true,
+              "source": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "destination": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "service": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "action": { "name": "Drop", "uid": "action-drop" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Implicit drop rule - all unmatched traffic is dropped and logged",
+              "meta-info": {
+                "creation-time": { "iso": "2025-01-01T00:00:00Z", "posix": 1735689600 },
+                "last-modifier": "superadmin",
+                "last-modified": { "iso": "2026-02-28T23:59:00Z", "posix": 1767650340 }
+              },
+              "hits": {
+                "hits": 1048576,
+                "first-date": { "iso": "2025-01-01T00:01:00Z", "posix": 1735689660 },
+                "last-date": { "iso": "2026-03-20T14:22:00Z", "posix": 1767788520 }
+              }
+            }
+          ],
+          "inline-layers": [
+            {
+              "name": "Content Filtering - Inline Layer",
+              "uid": "layer-inline-content",
+              "shared": false,
+              "inline": true,
+              "rules": [
+                {
+                  "uid": "inline-rule-0001",
+                  "rule-number": 1,
+                  "name": "Block Social Media",
+                  "enabled": true,
+                  "source": [
+                    { "name": "Internal_Net", "uid": "obj-net-internal" }
+                  ],
+                  "destination": [
+                    { "name": "External_Net", "uid": "obj-net-external" }
+                  ],
+                  "service": [
+                    { "name": "http", "uid": "obj-svc-http" },
+                    { "name": "https", "uid": "obj-svc-https" }
+                  ],
+                  "action": { "name": "Drop", "uid": "action-drop" },
+                  "track": {
+                    "type": "Log",
+                    "accounting": false,
+                    "alert": false
+                  },
+                  "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+                  "time": { "name": "Business_Hours", "uid": "obj-time-business" },
+                  "user": { "name": "Any", "uid": "obj-any" },
+                  "content": [
+                    { "name": "Facebook", "uid": "obj-app-facebook" },
+                    { "name": "YouTube", "uid": "obj-app-youtube" },
+                    { "name": "Twitter", "uid": "obj-app-twitter" },
+                    { "name": "Instagram", "uid": "obj-app-instagram" }
+                  ],
+                  "comments": "Block social media sites during business hours for internal network"
+                },
+                {
+                  "uid": "inline-rule-0002",
+                  "rule-number": 2,
+                  "name": "Allow All Other Web",
+                  "enabled": true,
+                  "source": [
+                    { "name": "Internal_Net", "uid": "obj-net-internal" }
+                  ],
+                  "destination": [
+                    { "name": "External_Net", "uid": "obj-net-external" }
+                  ],
+                  "service": [
+                    { "name": "http", "uid": "obj-svc-http" },
+                    { "name": "https", "uid": "obj-svc-https" }
+                  ],
+                  "action": { "name": "Accept", "uid": "action-accept" },
+                  "track": {
+                    "type": "Log",
+                    "accounting": true,
+                    "alert": false
+                  },
+                  "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+                  "time": { "name": "Any", "uid": "obj-any" },
+                  "user": { "name": "Any", "uid": "obj-any" },
+                  "content": [
+                    { "name": "Any", "uid": "obj-any" }
+                  ],
+                  "comments": "Allow all non-blocked web traffic"
+                }
+              ]
+            },
+            {
+              "name": "Threat Prevention - Inline Layer",
+              "uid": "layer-inline-threat",
+              "shared": false,
+              "inline": true,
+              "parent-layer": "Network Access Layer",
+              "rules": [
+                {
+                  "uid": "threat-rule-0001",
+                  "rule-number": 1,
+                  "name": "Block Known Malicious IPs",
+                  "enabled": true,
+                  "source": [
+                    { "name": "Any", "uid": "obj-any" }
+                  ],
+                  "destination": [
+                    { "name": "Any", "uid": "obj-any" }
+                  ],
+                  "service": [
+                    { "name": "Any", "uid": "obj-any" }
+                  ],
+                  "action": { "name": "Drop", "uid": "action-drop" },
+                  "track": {
+                    "type": "Log",
+                    "accounting": false,
+                    "alert": true
+                  },
+                  "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+                  "time": { "name": "Any", "uid": "obj-any" },
+                  "user": { "name": "Any", "uid": "obj-any" },
+                  "threat-name": "Malicious IP Feed",
+                  "comments": "Drop traffic from known malicious IP addresses"
+                },
+                {
+                  "uid": "threat-rule-0002",
+                  "rule-number": 2,
+                  "name": "Block High-Risk Threats",
+                  "enabled": true,
+                  "source": [
+                    { "name": "Any", "uid": "obj-any" }
+                  ],
+                  "destination": [
+                    { "name": "Any", "uid": "obj-any" }
+                  ],
+                  "service": [
+                    { "name": "Any", "uid": "obj-any" }
+                  ],
+                  "action": { "name": "Prevent", "uid": "action-prevent" },
+                  "track": {
+                    "type": "Log",
+                    "accounting": false,
+                    "alert": true
+                  },
+                  "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+                  "time": { "name": "Any", "uid": "obj-any" },
+                  "user": { "name": "Any", "uid": "obj-any" },
+                  "threat-name": "High-Risk Signatures",
+                  "threat-category": ["Critical", "High"],
+                  "comments": "Block all critical and high severity threat signatures"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Application & URL Filtering Layer",
+          "uid": "layer-appctrl-5555-6666",
+          "shared": false,
+          "inline": false,
+          "rules": [
+            {
+              "uid": "app-rule-0001",
+              "rule-number": 1,
+              "name": "Block Peer-to-Peer",
+              "enabled": true,
+              "source": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "destination": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "service": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "action": { "name": "Drop", "uid": "action-drop" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "content": [
+                { "name": "BitTorrent", "uid": "obj-app-bittorrent" },
+                { "name": "LimeWire", "uid": "obj-app-limewire" },
+                { "name": "uTorrent", "uid": "obj-app-utorrent" }
+              ],
+              "comments": "Block peer-to-peer file sharing applications"
+            },
+            {
+              "uid": "app-rule-0002",
+              "rule-number": 2,
+              "name": "Allow Business Applications",
+              "enabled": true,
+              "source": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "destination": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "service": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": true,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "content": [
+                { "name": "Microsoft 365", "uid": "obj-app-m365" },
+                { "name": "Salesforce", "uid": "obj-app-salesforce" },
+                { "name": "Slack", "uid": "obj-app-slack" },
+                { "name": "Jira", "uid": "obj-app-jira" }
+              ],
+              "comments": "Allow essential business applications"
+            },
+            {
+              "uid": "app-rule-0003",
+              "rule-number": 3,
+              "name": "Block All Other Applications",
+              "enabled": true,
+              "source": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "destination": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "service": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "action": { "name": "Drop", "uid": "action-drop" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "content": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "comments": "Catch-all to block unapproved applications"
+            },
+            {
+              "uid": "app-rule-0004",
+              "rule-number": 4,
+              "name": "Allow Legacy Chat Application (DEPRECATED)",
+              "enabled": false,
+              "source": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "destination": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "service": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": {
+                "type": "Log",
+                "accounting": false,
+                "alert": false
+              },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "content": [
+                { "name": "AIM", "uid": "obj-app-aim" },
+                { "name": "ICQ", "uid": "obj-app-icq" }
+              ],
+              "comments": "Legacy chat apps - disabled, replaced by Slack"
+            }
+          ]
+        },
+        {
+          "name": "DMZ Access Layer",
+          "uid": "layer-dmz-7777-8888",
+          "shared": false,
+          "inline": false,
+          "rules": [
+            {
+              "uid": "dmz-rule-0001",
+              "rule-number": 1,
+              "name": "Allow HTTP/HTTPS to DMZ Web Server",
+              "enabled": true,
+              "source": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "destination": [
+                { "name": "WebServer", "uid": "obj-host-web" }
+              ],
+              "service": [
+                { "name": "http", "uid": "obj-svc-http" },
+                { "name": "https", "uid": "obj-svc-https" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": { "type": "Log", "accounting": true, "alert": false },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Permit inbound web traffic to DMZ web server"
+            },
+            {
+              "uid": "dmz-rule-0002",
+              "rule-number": 2,
+              "name": "Allow Web to App Server SQL Query",
+              "enabled": true,
+              "source": [
+                { "name": "WebServer", "uid": "obj-host-web" }
+              ],
+              "destination": [
+                { "name": "AppServer", "uid": "obj-host-app" }
+              ],
+              "service": [
+                { "name": "https", "uid": "obj-svc-https" },
+                { "name": "mssql", "uid": "obj-svc-mssql" },
+                { "name": "mysql", "uid": "obj-svc-mysql" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": { "type": "Log", "accounting": true, "alert": false },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow web server to query application server and databases"
+            },
+            {
+              "uid": "dmz-rule-0003",
+              "rule-number": 3,
+              "name": "Allow DNS from DMZ to External",
+              "enabled": true,
+              "source": [
+                { "name": "DMZ_Net", "uid": "obj-net-dmz" }
+              ],
+              "destination": [
+                { "name": "External_Net", "uid": "obj-net-external" }
+              ],
+              "service": [
+                { "name": "dns", "uid": "obj-svc-dns" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": { "type": "Log", "accounting": false, "alert": false },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow DMZ hosts to resolve external DNS"
+            },
+            {
+              "uid": "dmz-rule-0004",
+              "rule-number": 4,
+              "name": "Allow DMZ to Internal on Business Services",
+              "enabled": true,
+              "source": [
+                { "name": "DMZ_Net", "uid": "obj-net-dmz" }
+              ],
+              "destination": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "service": [
+                { "name": "https", "uid": "obj-svc-https" },
+                { "name": "mssql", "uid": "obj-svc-mssql" },
+                { "name": "smtp", "uid": "obj-svc-smtp" }
+              ],
+              "action": { "name": "Accept", "uid": "action-accept" },
+              "track": { "type": "Log", "accounting": true, "alert": false },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Business_Hours", "uid": "obj-time-business" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Allow DMZ to internal network for business services during business hours"
+            },
+            {
+              "uid": "dmz-rule-0005",
+              "rule-number": 5,
+              "name": "Block DMZ to Internal Everything Else",
+              "enabled": true,
+              "source": [
+                { "name": "DMZ_Net", "uid": "obj-net-dmz" }
+              ],
+              "destination": [
+                { "name": "Internal_Net", "uid": "obj-net-internal" }
+              ],
+              "service": [
+                { "name": "Any", "uid": "obj-any" }
+              ],
+              "action": { "name": "Drop", "uid": "action-drop" },
+              "track": { "type": "Log", "accounting": false, "alert": true },
+              "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+              "time": { "name": "Any", "uid": "obj-any" },
+              "user": { "name": "Any", "uid": "obj-any" },
+              "comments": "Block all other DMZ-to-internal traffic with alert"
+            }
+          ]
+        }
+      ]
+    },
+    "https-inspection-policy": {
+      "name": "HTTPS Inspection Policy",
+      "uid": "https-pol-uid-001",
+      "rules": [
+        {
+          "uid": "https-rule-0001",
+          "rule-number": 1,
+          "name": "Bypass Internal CA Sites",
+          "enabled": true,
+          "source": [
+            { "name": "Any", "uid": "obj-any" }
+          ],
+          "destination": [
+            { "name": "Internal_Net", "uid": "obj-net-internal" },
+            { "name": "DMZ_Net", "uid": "obj-net-dmz" }
+          ],
+          "service": [
+            { "name": "https", "uid": "obj-svc-https" }
+          ],
+          "action": { "name": "Bypass", "uid": "action-bypass" },
+          "track": { "type": "Log", "accounting": false, "alert": false },
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "time": { "name": "Any", "uid": "obj-any" },
+          "user": { "name": "Any", "uid": "obj-any" },
+          "comments": "Bypass inspection for internal sites using internal CA"
+        },
+        {
+          "uid": "https-rule-0002",
+          "rule-number": 2,
+          "name": "Bypass Health & Financial Sites",
+          "enabled": true,
+          "source": [
+            { "name": "Internal_Net", "uid": "obj-net-internal" }
+          ],
+          "destination": [
+            { "name": "External_Net", "uid": "obj-net-external" }
+          ],
+          "service": [
+            { "name": "https", "uid": "obj-svc-https" }
+          ],
+          "action": { "name": "Bypass", "uid": "action-bypass" },
+          "track": { "type": "Log", "accounting": false, "alert": false },
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "time": { "name": "Any", "uid": "obj-any" },
+          "user": { "name": "Any", "uid": "obj-any" },
+          "site-category": ["Health", "Finance", "Government"],
+          "comments": "Bypass HTTPS inspection for regulated industries due to legal constraints"
+        },
+        {
+          "uid": "https-rule-0003",
+          "rule-number": 3,
+          "name": "Inspect All External HTTPS",
+          "enabled": true,
+          "source": [
+            { "name": "Internal_Net", "uid": "obj-net-internal" }
+          ],
+          "destination": [
+            { "name": "External_Net", "uid": "obj-net-external" }
+          ],
+          "service": [
+            { "name": "https", "uid": "obj-svc-https" }
+          ],
+          "action": { "name": "Inspect", "uid": "action-inspect" },
+          "track": { "type": "Log", "accounting": true, "alert": false },
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "time": { "name": "Any", "uid": "obj-any" },
+          "user": { "name": "Any", "uid": "obj-any" },
+          "certificate": { "name": "Internal_CA", "uid": "obj-cert-ca" },
+          "comments": "Inspect all outbound HTTPS traffic using internal CA"
+        },
+        {
+          "uid": "https-rule-0004",
+          "rule-number": 4,
+          "name": "Block High-Risk Categories",
+          "enabled": true,
+          "source": [
+            { "name": "Internal_Net", "uid": "obj-net-internal" }
+          ],
+          "destination": [
+            { "name": "External_Net", "uid": "obj-net-external" }
+          ],
+          "service": [
+            { "name": "https", "uid": "obj-svc-https" }
+          ],
+          "action": { "name": "Drop", "uid": "action-drop" },
+          "track": { "type": "Log", "accounting": false, "alert": true },
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "time": { "name": "Any", "uid": "obj-any" },
+          "user": { "name": "Any", "uid": "obj-any" },
+          "site-category": ["Peer-to-Peer", "Phishing", "Malware", "Spyware"],
+          "comments": "Drop HTTPS access to high-risk site categories"
+        },
+        {
+          "uid": "https-rule-0005",
+          "rule-number": 5,
+          "name": "Inspect Admin Traffic",
+          "enabled": true,
+          "source": [
+            { "name": "Admin_Net", "uid": "obj-net-admin" },
+            { "name": "Monitoring_Net", "uid": "obj-net-monitoring" }
+          ],
+          "destination": [
+            { "name": "External_Net", "uid": "obj-net-external" }
+          ],
+          "service": [
+            { "name": "https", "uid": "obj-svc-https" }
+          ],
+          "action": { "name": "Inspect", "uid": "action-inspect" },
+          "track": { "type": "Log", "accounting": true, "alert": true },
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "time": { "name": "Any", "uid": "obj-any" },
+          "user": { "name": "IT_Admins", "uid": "obj-usr-it-admins" },
+          "certificate": { "name": "Internal_CA", "uid": "obj-cert-ca" },
+          "comments": "Inspect admin HTTPS traffic with alerting enabled"
+        },
+        {
+          "uid": "https-rule-0006",
+          "rule-number": 6,
+          "name": "Bypass Certificate Pinning Sites (DEPRECATED)",
+          "enabled": false,
+          "source": [
+            { "name": "Internal_Net", "uid": "obj-net-internal" }
+          ],
+          "destination": [
+            { "name": "External_Net", "uid": "obj-net-external" }
+          ],
+          "service": [
+            { "name": "https", "uid": "obj-svc-https" }
+          ],
+          "action": { "name": "Bypass", "uid": "action-bypass" },
+          "track": { "type": "Log", "accounting": false, "alert": false },
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "time": { "name": "Any", "uid": "obj-any" },
+          "user": { "name": "Any", "uid": "obj-any" },
+          "site-category": ["Software Updates", "Antivirus"],
+          "comments": "Deprecated - certificate pinning issues resolved in newer clients"
+        }
+      ]
+    },
+    "nat-policy": {
+      "name": "NAT Policy",
+      "uid": "nat-pol-uid-001",
+      "rules": [
+        {
+          "uid": "nat-rule-0001",
+          "rule-number": 1,
+          "name": "Hide Internal Network Behind Gateway",
+          "enabled": true,
+          "original-source": [
+            { "name": "Internal_Net", "uid": "obj-net-internal" }
+          ],
+          "original-destination": [
+            { "name": "External_Net", "uid": "obj-net-external" }
+          ],
+          "original-service": [
+            { "name": "Any", "uid": "obj-any" }
+          ],
+          "translated-source": [
+            { "name": "Security_Gateway", "uid": "obj-gw-main" }
+          ],
+          "translated-destination": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "translated-service": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "method": "hide",
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "action": { "name": "Accept", "uid": "action-accept" },
+          "comments": "Masquerade internal traffic to internet using gateway external IP",
+          "meta-info": {
+            "creation-time": { "iso": "2025-11-15T10:30:00Z", "posix": 1736937000 },
+            "last-modifier": "admin",
+            "last-modified": { "iso": "2026-03-20T14:22:00Z", "posix": 1767788520 }
+          },
+          "hits": {
+            "hits": 999999,
+            "first-date": { "iso": "2025-11-16T00:00:00Z", "posix": 1737024000 },
+            "last-date": { "iso": "2026-03-20T14:20:00Z", "posix": 1767788400 }
+          }
+        },
+        {
+          "uid": "nat-rule-0002",
+          "rule-number": 2,
+          "name": "Static NAT Web Server",
+          "enabled": true,
+          "original-source": [
+            { "name": "Any", "uid": "obj-any" }
+          ],
+          "original-destination": [
+            { "name": "WebServer_Public", "uid": "obj-host-web-pub" }
+          ],
+          "original-service": [
+            { "name": "http", "uid": "obj-svc-http" },
+            { "name": "https", "uid": "obj-svc-https" }
+          ],
+          "translated-source": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "translated-destination": [
+            { "name": "WebServer", "uid": "obj-host-web" }
+          ],
+          "translated-service": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "method": "static",
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "action": { "name": "Accept", "uid": "action-accept" },
+          "comments": "Static 1:1 NAT for public web server to internal DMZ address"
+        },
+        {
+          "uid": "nat-rule-0003",
+          "rule-number": 3,
+          "name": "Port Forward SMTP to Mail Server",
+          "enabled": true,
+          "original-source": [
+            { "name": "Any", "uid": "obj-any" }
+          ],
+          "original-destination": [
+            { "name": "MailServer_Public", "uid": "obj-host-mail-pub" }
+          ],
+          "original-service": [
+            { "name": "smtp", "uid": "obj-svc-smtp" }
+          ],
+          "translated-source": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "translated-destination": [
+            { "name": "MailServer", "uid": "obj-host-mail" }
+          ],
+          "translated-service": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "method": "static",
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "action": { "name": "Accept", "uid": "action-accept" },
+          "comments": "Port forward SMTP traffic from public IP to internal mail server"
+        },
+        {
+          "uid": "nat-rule-0004",
+          "rule-number": 4,
+          "name": "NAT VPN Pool to Internal",
+          "enabled": true,
+          "original-source": [
+            { "name": "VPN_Pool", "uid": "obj-net-vpn" }
+          ],
+          "original-destination": [
+            { "name": "Internal_Net", "uid": "obj-net-internal" },
+            { "name": "DMZ_Net", "uid": "obj-net-dmz" }
+          ],
+          "original-service": [
+            { "name": "Any", "uid": "obj-any" }
+          ],
+          "translated-source": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "translated-destination": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "translated-service": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "method": "static",
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "action": { "name": "Accept", "uid": "action-accept" },
+          "comments": "Allow VPN users direct access to internal resources without translation"
+        },
+        {
+          "uid": "nat-rule-0005",
+          "rule-number": 5,
+          "name": "Static NAT Legacy FTP Server (DEPRECATED)",
+          "enabled": false,
+          "original-source": [
+            { "name": "Any", "uid": "obj-any" }
+          ],
+          "original-destination": [
+            { "name": "FTP_Server_Public", "uid": "obj-host-ftp-pub" }
+          ],
+          "original-service": [
+            { "name": "ftp", "uid": "obj-svc-ftp" }
+          ],
+          "translated-source": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "translated-destination": [
+            { "name": "WebServer", "uid": "obj-host-web" }
+          ],
+          "translated-service": [
+            { "name": "Original", "uid": "obj-original" }
+          ],
+          "method": "static",
+          "install-on": { "name": "Policy Targets", "uid": "obj-policy-targets" },
+          "action": { "name": "Accept", "uid": "action-accept" },
+          "comments": "Deprecated FTP NAT rule - disabled for security"
+        }
+      ]
+    }
+  },
+  "objects": {
+    "hosts": [
+      {
+        "name": "WebServer",
+        "uid": "obj-host-web",
+        "ip-address": "10.2.1.10",
+        "type": "host",
+        "comments": "Public web server in DMZ"
+      },
+      {
+        "name": "AppServer",
+        "uid": "obj-host-app",
+        "ip-address": "10.1.2.20",
+        "type": "host",
+        "comments": "Application server in internal network"
+      },
+      {
+        "name": "DBServer",
+        "uid": "obj-host-db",
+        "ip-address": "10.1.2.10",
+        "type": "host",
+        "comments": "Primary database server"
+      },
+      {
+        "name": "MailServer",
+        "uid": "obj-host-mail",
+        "ip-address": "10.1.3.10",
+        "type": "host",
+        "comments": "Internal mail server"
+      },
+      {
+        "name": "DNS_Server",
+        "uid": "obj-host-dns",
+        "ip-address": "10.1.1.5",
+        "type": "host",
+        "comments": "Internal DNS server"
+      },
+      {
+        "name": "Security_Gateway",
+        "uid": "obj-gw-main",
+        "ip-address": "10.1.1.1",
+        "interfaces": [
+          { "name": "eth0", "ip-address": "203.0.113.1", "network": "External" },
+          { "name": "eth1", "ip-address": "10.1.1.1", "network": "Internal" },
+          { "name": "eth2", "ip-address": "10.2.1.1", "network": "DMZ" }
+        ],
+        "type": "gateway",
+        "comments": "Main security gateway with 3 interfaces"
+      },
+      {
+        "name": "WebServer_Public",
+        "uid": "obj-host-web-pub",
+        "ip-address": "203.0.113.10",
+        "type": "host",
+        "comments": "Public-facing IP for web server (NAT)"
+      },
+      {
+        "name": "MailServer_Public",
+        "uid": "obj-host-mail-pub",
+        "ip-address": "203.0.113.20",
+        "type": "host",
+        "comments": "Public-facing IP for mail server (NAT)"
+      },
+      {
+        "name": "FTP_Server_Public",
+        "uid": "obj-host-ftp-pub",
+        "ip-address": "203.0.113.30",
+        "type": "host",
+        "comments": "Public-facing IP for legacy FTP server (NAT, deprecated)"
+      }
+    ],
+    "networks": [
+      {
+        "name": "Internal_Net",
+        "uid": "obj-net-internal",
+        "subnet": "10.1.0.0",
+        "mask": "255.255.0.0",
+        "mask-length": 16,
+        "type": "network",
+        "comments": "Internal corporate network"
+      },
+      {
+        "name": "DMZ_Net",
+        "uid": "obj-net-dmz",
+        "subnet": "10.2.0.0",
+        "mask": "255.255.0.0",
+        "mask-length": 16,
+        "type": "network",
+        "comments": "DMZ network for public-facing services"
+      },
+      {
+        "name": "Admin_Net",
+        "uid": "obj-net-admin",
+        "subnet": "10.1.10.0",
+        "mask": "255.255.255.0",
+        "mask-length": 24,
+        "type": "network",
+        "comments": "Administration network"
+      },
+      {
+        "name": "Monitoring_Net",
+        "uid": "obj-net-monitoring",
+        "subnet": "10.1.20.0",
+        "mask": "255.255.255.0",
+        "mask-length": 24,
+        "type": "network",
+        "comments": "Network monitoring and management"
+      },
+      {
+        "name": "External_Net",
+        "uid": "obj-net-external",
+        "subnet": "0.0.0.0",
+        "mask": "0.0.0.0",
+        "mask-length": 0,
+        "type": "network",
+        "comments": "Internet / External networks"
+      },
+      {
+        "name": "VPN_Pool",
+        "uid": "obj-net-vpn",
+        "subnet": "10.3.0.0",
+        "mask": "255.255.0.0",
+        "mask-length": 16,
+        "type": "network",
+        "comments": "VPN client address pool"
+      }
+    ],
+    "groups": [
+      {
+        "name": "Internal_Servers",
+        "uid": "obj-grp-servers",
+        "type": "group",
+        "members": [
+          { "name": "WebServer", "uid": "obj-host-web" },
+          { "name": "AppServer", "uid": "obj-host-app" },
+          { "name": "DBServer", "uid": "obj-host-db" },
+          { "name": "MailServer", "uid": "obj-host-mail" },
+          { "name": "DNS_Server", "uid": "obj-host-dns" }
+        ],
+        "comments": "Group containing all internal servers"
+      },
+      {
+        "name": "All_Internal_Networks",
+        "uid": "obj-grp-all-internal",
+        "type": "group",
+        "members": [
+          { "name": "Internal_Net", "uid": "obj-net-internal" },
+          { "name": "DMZ_Net", "uid": "obj-net-dmz" },
+          { "name": "Admin_Net", "uid": "obj-net-admin" },
+          { "name": "Monitoring_Net", "uid": "obj-net-monitoring" }
+        ],
+        "comments": "Group of all internal-facing networks"
+      }
+    ],
+    "services": [
+      {
+        "name": "http",
+        "uid": "obj-svc-http",
+        "port": 80,
+        "protocol": "tcp",
+        "type": "service-tcp",
+        "comments": "Hypertext Transfer Protocol"
+      },
+      {
+        "name": "https",
+        "uid": "obj-svc-https",
+        "port": 443,
+        "protocol": "tcp",
+        "type": "service-tcp",
+        "comments": "Hypertext Transfer Protocol Secure"
+      },
+      {
+        "name": "ssh",
+        "uid": "obj-svc-ssh",
+        "port": 22,
+        "protocol": "tcp",
+        "type": "service-tcp",
+        "comments": "Secure Shell"
+      },
+      {
+        "name": "dns",
+        "uid": "obj-svc-dns",
+        "port": 53,
+        "protocol": "udp",
+        "type": "service-udp",
+        "comments": "Domain Name System"
+      },
+      {
+        "name": "mssql",
+        "uid": "obj-svc-mssql",
+        "port": 1433,
+        "protocol": "tcp",
+        "type": "service-tcp",
+        "comments": "Microsoft SQL Server"
+      },
+      {
+        "name": "mysql",
+        "uid": "obj-svc-mysql",
+        "port": 3306,
+        "protocol": "tcp",
+        "type": "service-tcp",
+        "comments": "MySQL Database"
+      },
+      {
+        "name": "smtp",
+        "uid": "obj-svc-smtp",
+        "port": 25,
+        "protocol": "tcp",
+        "type": "service-tcp",
+        "comments": "Simple Mail Transfer Protocol"
+      },
+      {
+        "name": "imap",
+        "uid": "obj-svc-imap",
+        "port": 143,
+        "protocol": "tcp",
+        "type": "service-tcp",
+        "comments": "Internet Message Access Protocol"
+      },
+      {
+        "name": "rdp",
+        "uid": "obj-svc-rdp",
+        "port": 3389,
+        "protocol": "tcp",
+        "type": "service-tcp",
+        "comments": "Remote Desktop Protocol"
+      },
+      {
+        "name": "icmp-request",
+        "uid": "obj-svc-icmp-request",
+        "protocol": "icmp",
+        "icmp-type": 8,
+        "icmp-code": 0,
+        "type": "service-icmp",
+        "comments": "ICMP Echo Request (ping)"
+      },
+      {
+        "name": "icmp-reply",
+        "uid": "obj-svc-icmp-reply",
+        "protocol": "icmp",
+        "icmp-type": 0,
+        "icmp-code": 0,
+        "type": "service-icmp",
+        "comments": "ICMP Echo Reply"
+      },
+      {
+        "name": "ftp",
+        "uid": "obj-svc-ftp",
+        "port": 21,
+        "protocol": "tcp",
+        "type": "service-tcp",
+        "comments": "File Transfer Protocol"
+      }
+    ],
+    "application-sites": [
+      {
+        "name": "Facebook",
+        "uid": "obj-app-facebook",
+        "type": "application-site",
+        "category": "Social Networking",
+        "risk": "Medium",
+        "comments": "Facebook social media platform"
+      },
+      {
+        "name": "YouTube",
+        "uid": "obj-app-youtube",
+        "type": "application-site",
+        "category": "Media Streaming",
+        "risk": "Medium",
+        "comments": "YouTube video streaming"
+      },
+      {
+        "name": "Twitter",
+        "uid": "obj-app-twitter",
+        "type": "application-site",
+        "category": "Social Networking",
+        "risk": "Low",
+        "comments": "Twitter social media platform"
+      },
+      {
+        "name": "Instagram",
+        "uid": "obj-app-instagram",
+        "type": "application-site",
+        "category": "Social Networking",
+        "risk": "Medium",
+        "comments": "Instagram social media platform"
+      },
+      {
+        "name": "BitTorrent",
+        "uid": "obj-app-bittorrent",
+        "type": "application-site",
+        "category": "Peer-to-Peer",
+        "risk": "Very High",
+        "comments": "BitTorrent file sharing protocol"
+      },
+      {
+        "name": "uTorrent",
+        "uid": "obj-app-utorrent",
+        "type": "application-site",
+        "category": "Peer-to-Peer",
+        "risk": "Very High",
+        "comments": "uTorrent BitTorrent client"
+      },
+      {
+        "name": "LimeWire",
+        "uid": "obj-app-limewire",
+        "type": "application-site",
+        "category": "Peer-to-Peer",
+        "risk": "High",
+        "comments": "LimeWire P2P file sharing"
+      },
+      {
+        "name": "Microsoft 365",
+        "uid": "obj-app-m365",
+        "type": "application-site",
+        "category": "Cloud Services",
+        "risk": "Low",
+        "comments": "Microsoft 365 productivity suite"
+      },
+      {
+        "name": "Salesforce",
+        "uid": "obj-app-salesforce",
+        "type": "application-site",
+        "category": "Business Applications",
+        "risk": "Low",
+        "comments": "Salesforce CRM platform"
+      },
+      {
+        "name": "Slack",
+        "uid": "obj-app-slack",
+        "type": "application-site",
+        "category": "Business Applications",
+        "risk": "Low",
+        "comments": "Slack team communication"
+      },
+      {
+        "name": "Jira",
+        "uid": "obj-app-jira",
+        "type": "application-site",
+        "category": "Business Applications",
+        "risk": "Low",
+        "comments": "Atlassian Jira project management"
+      },
+      {
+        "name": "AIM",
+        "uid": "obj-app-aim",
+        "type": "application-site",
+        "category": "Instant Messaging",
+        "risk": "Medium",
+        "comments": "AOL Instant Messenger"
+      },
+      {
+        "name": "ICQ",
+        "uid": "obj-app-icq",
+        "type": "application-site",
+        "category": "Instant Messaging",
+        "risk": "Medium",
+        "comments": "ICQ chat program"
+      }
+    ],
+    "users": [
+      {
+        "name": "IT_Admins",
+        "uid": "obj-usr-it-admins",
+        "type": "user-group",
+        "members": ["admin", "sysadmin", "network-admin"],
+        "comments": "IT administrators group"
+      },
+      {
+        "name": "Internal_Users",
+        "uid": "obj-usr-internal",
+        "type": "user-group",
+        "comments": "All internal domain users"
+      },
+      {
+        "name": "Guest_Users",
+        "uid": "obj-usr-guests",
+        "type": "user-group",
+        "comments": "Guest network users with restricted access"
+      }
+    ],
+    "time-objects": [
+      {
+        "name": "Business_Hours",
+        "uid": "obj-time-business",
+        "type": "time-group",
+        "start-time": "08:00",
+        "end-time": "18:00",
+        "days": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        "comments": "Monday to Friday, 08:00 - 18:00"
+      },
+      {
+        "name": "Weekend",
+        "uid": "obj-time-weekend",
+        "type": "time-group",
+        "start-time": "00:00",
+        "end-time": "23:59",
+        "days": ["Sat", "Sun"],
+        "comments": "Saturday and Sunday all day"
+      },
+      {
+        "name": "Maintenance_Window",
+        "uid": "obj-time-maint",
+        "type": "time-group",
+        "start-time": "01:00",
+        "end-time": "05:00",
+        "days": ["Sun"],
+        "comments": "Sunday morning maintenance window"
+      }
+    ],
+    "certificates": [
+      {
+        "name": "Internal_CA",
+        "uid": "obj-cert-ca",
+        "type": "certificate",
+        "comments": "Internal Certificate Authority for HTTPS inspection"
+      }
+    ]
+  },
+  "global-properties": {
+    "policy-name": "Enterprise_Security_Policy",
+    "policy-version": "R81.10",
+    "install-timestamp": "2026-03-20T14:30:00Z",
+    "access-control": {
+      "implied-rules": {
+        "accept-vpn-traffic": true,
+        "drop-encrypted-traffic": false,
+        "allow-rfc1918-before-implied": true
+      },
+      "threat-prevention": {
+        "enabled": true,
+        "inline-mode": true,
+        "profiles": ["Standard_Threat_Prevention"]
+      }
+    }
+  }
+}

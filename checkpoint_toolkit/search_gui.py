@@ -11,7 +11,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 try:
-    from fetch_policy import CheckpointAPIClient
+    from fetch_policy import fetch_policy, VENDORS, CheckpointAPIClient
     HAS_FETCH = True
 except ImportError:
     HAS_FETCH = False
@@ -218,9 +218,11 @@ def flatten_rule_for_display(layer, rule, lookup):
     idx = rule.get('_inline_index', '')
     rule_num = f"{parent}.{idx}" if parent and idx else rule.get('rule-number', '')
 
+    uid = rule.get('uid', '')
     return {
         "layer": layer,
         "rule-number": rule_num,
+        "rule-id": uid,
         "name": rule.get('name', ''),
         "status": "Disabled" if rule.get('enabled') is False else "Enabled",
         "source": _names_ips(rule.get('source', []), lookup),
@@ -232,7 +234,7 @@ def flatten_rule_for_display(layer, rule, lookup):
         "action": action,
         "track": track,
         "comments": rule.get('comments', ''),
-        "uid": rule.get('uid', ''),
+        "uid": uid,
         "hits": hm.get('hits', '') if isinstance(hm, dict) else '',
         "creation-time": meta.get('creation-time', {}).get('iso', '') if isinstance(meta.get('creation-time'), dict) else '',
         "last-modified": meta.get('last-modified', {}).get('iso', '') if isinstance(meta.get('last-modified'), dict) else '',
@@ -266,8 +268,10 @@ def flatten_nat_for_display(rule, lookup):
     meta = rule.get('meta-info', {}) or {}
     hm = rule.get('hits', {}) or {}
 
+    uid = rule.get('uid', '')
     return {
         "rule-number": rule.get('rule-number', ''),
+        "rule-id": uid,
         "name": rule.get('name', ''),
         "status": "Disabled" if rule.get('enabled') is False else "Enabled",
         "original-source": _names(rule.get('original-source', [])),
@@ -286,7 +290,7 @@ def flatten_nat_for_display(rule, lookup):
         "action": action,
         "install-on": install,
         "comments": rule.get('comments', ''),
-        "uid": rule.get('uid', ''),
+        "uid": uid,
         "hits": hm.get('hits', '') if isinstance(hm, dict) else '',
         "creation-time": meta.get('creation-time', {}).get('iso', '') if isinstance(meta.get('creation-time'), dict) else '',
         "last-modified": meta.get('last-modified', {}).get('iso', '') if isinstance(meta.get('last-modified'), dict) else '',
@@ -310,7 +314,7 @@ def collect_objects(data):
 # ================================================================ GUI
 
 class SearchGUI:
-    NAT_COLS = ("rule-number", "name", "status",
+    NAT_COLS = ("rule-number", "rule-id", "name", "status",
                 "original-source", "original-source-ips",
                 "original-destination", "original-destination-ips",
                 "original-service", "original-service-ports",
@@ -319,7 +323,7 @@ class SearchGUI:
                 "translated-service", "translated-service-ports",
                 "method", "action", "install-on", "comments",
                 "uid", "hits", "creation-time", "last-modified")
-    RULE_COLS = ("layer", "rule-number", "name", "status",
+    RULE_COLS = ("layer", "rule-number", "rule-id", "name", "status",
                  "source", "source-ips",
                  "destination", "destination-ips",
                  "service", "service-ports",
@@ -357,7 +361,7 @@ class SearchGUI:
         self.file_label.pack(side=tk.LEFT, padx=5)
         ttk.Button(toolbar, text="Open", command=self.open_file).pack(side=tk.LEFT, padx=2)
         if HAS_FETCH:
-            ttk.Button(toolbar, text="Download", command=self._download_dialog).pack(side=tk.LEFT, padx=2)
+            ttk.Button(toolbar, text="Download Policy from Firewall", command=self._download_dialog).pack(side=tk.LEFT, padx=2)
 
         # ---- banner
         banner = tk.Frame(root, bg="#1a3a5c", height=56)
@@ -383,7 +387,7 @@ class SearchGUI:
 
         info_frame = tk.Frame(banner, bg="#1a3a5c")
         info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, pady=4)
-        tk.Label(info_frame, text="Checkpoint Policy Toolkit",
+        tk.Label(info_frame, text="Firewall Policy Toolkit"+" Checkpoint/Fortinet/PaloAlto",
                  bg="#1a3a5c", fg="white",
                  font=("Helvetica", 13, "bold")).pack(anchor=tk.W)
         tk.Label(info_frame,
@@ -526,6 +530,7 @@ class SearchGUI:
         for col in c:
             self.rule_tree.heading(col, text=col, command=lambda _c=col: self._sort(self.rule_tree, _c, False))
             self.rule_tree.column(col, width=110, minwidth=60)
+        self.rule_tree.column("rule-id", width=160)
         self.rule_tree.column("name", width=220)
         self.rule_tree.column("source", width=220)
         self.rule_tree.column("destination", width=220)
@@ -718,6 +723,7 @@ class SearchGUI:
         for col in c:
             self.nat_tree.heading(col, text=col, command=lambda _c=col: self._sort(self.nat_tree, _c, False))
             self.nat_tree.column(col, width=120, minwidth=60)
+        self.nat_tree.column("rule-id", width=160)
         self.nat_tree.column("name", width=200)
         self.nat_tree.column("original-source", width=180)
         self.nat_tree.column("original-destination", width=180)
@@ -816,13 +822,13 @@ class SearchGUI:
     # ============================================================ download dialog
 
     def _download_dialog(self):
-        """Open a dialog to download policy from a live Checkpoint management server."""
+        """Open a dialog to download policy from a live firewall."""
         if not HAS_FETCH:
             messagebox.showerror("Error", "fetch_policy.py not found in toolkit directory.")
             return
 
         dlg = tk.Toplevel(self.root)
-        dlg.title("Download Policy from Management Server")
+        dlg.title("Download Policy from Firewall")
         dlg.geometry("620x580")
         dlg.transient(self.root)
         dlg.grab_set()
@@ -853,8 +859,15 @@ class SearchGUI:
         ssl_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(cf, text="Verify SSL", variable=ssl_var).grid(row=3, column=1, padx=80, pady=2, sticky=tk.W)
 
+        ttk.Label(cf, text="Vendor:").grid(row=4, column=0, sticky=tk.W, pady=2)
+        vendor_var = tk.StringVar(value="auto")
+        vendor_combo = ttk.Combobox(cf, textvariable=vendor_var,
+                                    values=["auto", "checkpoint", "paloalto", "fortinet"],
+                                    state="readonly", width=20)
+        vendor_combo.grid(row=4, column=1, sticky=tk.W, padx=5, pady=2)
+
         connect_btn = ttk.Button(cf, text="Connect & Fetch Layers")
-        connect_btn.grid(row=4, column=0, columnspan=2, pady=6)
+        connect_btn.grid(row=5, column=0, columnspan=2, pady=6)
 
         # -- layers frame
         lf = ttk.LabelFrame(dlg, text="Access Layers (select to include)", padding=10)
@@ -920,35 +933,77 @@ class SearchGUI:
                 connect_btn.config(state=tk.NORMAL)
                 return
 
+            vendor = vendor_var.get().strip().lower()
+            if vendor == "auto":
+                vendor = None
+
+            is_checkpoint = (vendor is None or vendor == "checkpoint")
+
             try:
-                client = CheckpointAPIClient(server, username, password,
-                                              port=port, verify=ssl_var.get())
-                _client_ref[0] = client
-                status_var.set("Connected. Fetching access layers ...")
-                dlg.update()
-                layer_names = client.fetch_layers()
+                if is_checkpoint:
+                    client = CheckpointAPIClient(server, username, password,
+                                                  port=port, verify=ssl_var.get())
+                    _client_ref[0] = client
+                    status_var.set("Connected. Fetching access layers ...")
+                    dlg.update()
+                    layer_names = client.fetch_layers()
+                    for cb in layer_checkboxes:
+                        cb[0].destroy()
+                    layer_checkboxes.clear()
+                    if not layer_names:
+                        status_var.set("No access layers found on the server.")
+                        connect_btn.config(state=tk.NORMAL)
+                        return
+                    for ln in layer_names:
+                        var = tk.BooleanVar(value=True)
+                        cb = ttk.Checkbutton(layer_inner, text=ln, variable=var)
+                        cb.pack(anchor=tk.W, padx=5, pady=1)
+                        layer_checkboxes.append((cb, var))
+                    download_btn.config(state=tk.NORMAL)
+                    status_var.set(f"Connected. {len(layer_names)} layer(s) found. Select layers and click Download.")
+                else:
+                    # PA / FortiGate: fetch all directly
+                    from fetch_policy import fetch_policy as _fp
+                    data = _fp(server, port, username, password, vendor=vendor, verify=ssl_var.get())
+                    ok = _save_and_load_download(data, dlg, status_var)
+                    if not ok:
+                        connect_btn.config(state=tk.NORMAL)
+                    return  # dialog destroyed on success
+
             except (SystemExit, Exception) as e:
                 msg = str(e).strip() or "Connection failed"
                 status_var.set(f"Error: {msg}")
                 connect_btn.config(state=tk.NORMAL)
                 return
 
-            # Populate layer checkboxes
-            for cb in layer_checkboxes:
-                cb[0].destroy()
-            layer_checkboxes.clear()
-            if not layer_names:
-                status_var.set("No access layers found on the server.")
-                connect_btn.config(state=tk.NORMAL)
-                return
-            for ln in layer_names:
-                var = tk.BooleanVar(value=True)
-                cb = ttk.Checkbutton(layer_inner, text=ln, variable=var)
-                cb.pack(anchor=tk.W, padx=5, pady=1)
-                layer_checkboxes.append((cb, var))
-            download_btn.config(state=tk.NORMAL)
-            status_var.set(f"Connected. {len(layer_names)} layer(s) found. Select layers and click Download.")
             connect_btn.config(state=tk.NORMAL)
+
+        def _save_and_load_download(data, original_dlg, status_var):
+            status_var.set("Sanitizing data ...")
+            original_dlg.update()
+            data = _sanitize(data)
+            status_var.set("Saving ...")
+            original_dlg.update()
+            out_dir = "outputs"
+            if not os.path.exists(out_dir):
+                os.makedirs(out_dir, exist_ok=True)
+            default_name = "firewall_policy.json"
+            save_path = filedialog.asksaveasfilename(
+                title="Save policy as",
+                initialdir=os.path.abspath(out_dir),
+                initialfile=default_name,
+                defaultextension=".json",
+                filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+            if not save_path:
+                status_var.set("Save cancelled.")
+                return False
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, default=str)
+            status_var.set("Loading into GUI ...")
+            original_dlg.update()
+            original_dlg.destroy()
+            self._load(save_path)
+            return True
 
         def _do_download():
             selected = [ln for (_, var), ln in zip(layer_checkboxes,
@@ -1024,28 +1079,17 @@ class SearchGUI:
                     "objects": objects,
                 }
 
-                status_var.set("Sanitizing data ...")
-                dlg.update()
-                data = _sanitize(data)
-                status_var.set("Saving ...")
-                dlg.update()
-                out_dir = "outputs"
-                if not os.path.exists(out_dir):
-                    os.makedirs(out_dir, exist_ok=True)
-                default_name = f"checkpoint_policy.json"
-                save_path = filedialog.asksaveasfilename(
-                    title="Save policy as",
-                    initialdir=os.path.abspath(out_dir),
-                    initialfile=default_name,
-                    defaultextension=".json",
-                    filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
-                if not save_path:
-                    status_var.set("Save cancelled.")
+                ok = _save_and_load_download(data, dlg, status_var)
+                if not ok:
                     download_btn.config(state=tk.NORMAL)
                     connect_btn.config(state=tk.NORMAL)
                     return
-                with open(save_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, default=str)
+                # dialog destroyed by _save_and_load_download on success
+                try:
+                    client.logout()
+                except Exception:
+                    pass
+                return
 
             except (SystemExit, Exception) as e:
                 msg = str(e).strip() or "Download failed"
@@ -1053,16 +1097,6 @@ class SearchGUI:
                 download_btn.config(state=tk.NORMAL)
                 connect_btn.config(state=tk.NORMAL)
                 return
-
-            try:
-                client.logout()
-            except Exception:
-                pass
-
-            status_var.set("Loading into GUI ...")
-            dlg.update()
-            dlg.destroy()
-            self._load(save_path)
 
         connect_btn.config(command=_do_connect)
         download_btn.config(command=_do_download)

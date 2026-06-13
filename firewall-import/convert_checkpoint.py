@@ -145,6 +145,7 @@ class ObjectResolver:
 def flatten_rule(rule, resolver):
     flat = {}
     flat['rule-number'] = rule.get('_rule-number') or rule.get('rule-number', '')
+    flat['rule-id'] = rule.get('uid', '')
     flat['policy-name'] = rule.get('_policy-name', '')
     flat['rule-type'] = rule.get('_rule-type', '')
     enabled = rule.get('enabled', True)
@@ -200,6 +201,7 @@ def flatten_rule(rule, resolver):
 def flatten_nat_rule(rule, resolver):
     flat = {}
     flat['rule-number'] = rule.get('rule-number', '')
+    flat['rule-id'] = rule.get('uid', '')
     flat['name'] = rule.get('name', '')
     flat['status'] = 'Enabled' if rule.get('enabled') is not False else 'Disabled'
     flat['method'] = rule.get('method', '')

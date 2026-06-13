@@ -1,0 +1,284 @@
+{
+  "policy-package": {
+    "name": "FG-Enterprise-Policy",
+    "uid": "fg-policy-001",
+    "meta-info": { "fetched-at": "2026-06-13T10:00:00Z" },
+    "access-control-policy": {
+      "layers": [
+        {
+          "name": "IPv4 Policy",
+          "uid": "fg-layer-v4-001",
+          "rules": [
+            {
+              "uid": "fg-rule-0001",
+              "rule-number": "1",
+              "name": "Internal to Internet",
+              "enabled": true,
+              "source": [{"name": "Internal_Net"}],
+              "destination": [{"name": "External_Net"}],
+              "service": [{"name": "HTTP"}, {"name": "HTTPS"}, {"name": "DNS"}],
+              "action": {"name": "accept"},
+              "track": {"type": "Log All"},
+              "install-on": {"name": "FG-200E"},
+              "time": {"name": "Always"},
+              "user": {"name": "Any"},
+              "comments": "Allow internal users to access internet",
+              "meta-info": {
+                "creation-time": {"iso": "2026-01-01T00:00:00Z"},
+                "last-modified": {"iso": "2026-05-20T14:00:00Z"}
+              },
+              "hits": {"hits": "234567"},
+              "source-interface": "port1",
+              "destination-interface": "port2",
+              "schedule": "Always",
+              "profile": ["default-protection"],
+              "log-setting": "default-log",
+              "nat": true,
+              "_rule-type": "firewall",
+              "_policy-name": "FG-Enterprise-Policy",
+              "_layer": "IPv4 Policy"
+            },
+            {
+              "uid": "fg-rule-0002",
+              "rule-number": "2",
+              "name": "DMZ Access to Internal Server",
+              "enabled": true,
+              "source": [{"name": "DMZ_Net"}],
+              "destination": [{"name": "Internal_AppServer"}],
+              "service": [{"name": "HTTPS"}, {"name": "TCP_8080"}],
+              "action": {"name": "accept"},
+              "track": {"type": "Log All"},
+              "install-on": {"name": "FG-200E"},
+              "time": {"name": "WorkHours"},
+              "user": {"name": "Any"},
+              "comments": "Allow DMZ to access internal application server",
+              "meta-info": {
+                "creation-time": {"iso": "2026-02-10T09:00:00Z"},
+                "last-modified": {"iso": "2026-04-15T11:00:00Z"}
+              },
+              "hits": {"hits": "5432"},
+              "source-interface": "port3",
+              "destination-interface": "port1",
+              "schedule": "WorkHours",
+              "log-setting": "default-log",
+              "_rule-type": "firewall",
+              "_policy-name": "FG-Enterprise-Policy",
+              "_layer": "IPv4 Policy"
+            },
+            {
+              "uid": "fg-rule-0003",
+              "rule-number": "3",
+              "name": "Outbound Mail Traffic",
+              "enabled": true,
+              "source": [{"name": "Mail_Servers"}],
+              "destination": [{"name": "External_Net"}],
+              "service": [{"name": "SMTP"}, {"name": "SMTPS"}],
+              "action": {"name": "accept"},
+              "track": {"type": "Log All"},
+              "install-on": {"name": "FG-200E"},
+              "time": {"name": "Always"},
+              "user": {"name": "Any"},
+              "comments": "Allow mail servers to send email externally",
+              "meta-info": {
+                "creation-time": {"iso": "2026-01-05T08:00:00Z"},
+                "last-modified": {"iso": "2026-03-10T10:00:00Z"}
+              },
+              "hits": {"hits": "89234"},
+              "source-interface": "port1",
+              "destination-interface": "port2",
+              "schedule": "Always",
+              "log-setting": "default-log",
+              "_rule-type": "firewall",
+              "_policy-name": "FG-Enterprise-Policy",
+              "_layer": "IPv4 Policy"
+            },
+            {
+              "uid": "fg-rule-0004",
+              "rule-number": "4",
+              "name": "Block Malicious Sources",
+              "enabled": true,
+              "source": [{"name": "Blacklist_IPs"}],
+              "destination": [{"name": "Any"}],
+              "service": [{"name": "Any"}],
+              "action": {"name": "deny"},
+              "track": {"type": "Log All"},
+              "install-on": {"name": "FG-200E"},
+              "time": {"name": "Always"},
+              "user": {"name": "Any"},
+              "comments": "Block known malicious IP addresses",
+              "meta-info": {
+                "creation-time": {"iso": "2026-03-01T12:00:00Z"},
+                "last-modified": {"iso": "2026-06-10T08:00:00Z"}
+              },
+              "hits": {"hits": "3421"},
+              "source-interface": "Any",
+              "destination-interface": "Any",
+              "schedule": "Always",
+              "log-setting": "default-log",
+              "_rule-type": "firewall",
+              "_policy-name": "FG-Enterprise-Policy",
+              "_layer": "IPv4 Policy"
+            },
+            {
+              "uid": "fg-rule-0005",
+              "rule-number": "5",
+              "name": "VPN Remote Access",
+              "enabled": true,
+              "source": [{"name": "VPN_Pool"}],
+              "destination": [{"name": "Internal_Net"}],
+              "service": [{"name": "Any"}],
+              "action": {"name": "accept"},
+              "track": {"type": "Log All"},
+              "install-on": {"name": "FG-200E"},
+              "time": {"name": "Always"},
+              "user": [{"name": "remote-users"}],
+              "comments": "Allow VPN users to access internal network",
+              "meta-info": {
+                "creation-time": {"iso": "2026-01-01T00:00:00Z"},
+                "last-modified": {"iso": "2026-02-20T16:00:00Z"}
+              },
+              "hits": {"hits": "12389"},
+              "source-interface": "ssl.root",
+              "destination-interface": "port1",
+              "schedule": "Always",
+              "log-setting": "default-log",
+              "nat": false,
+              "_rule-type": "firewall",
+              "_policy-name": "FG-Enterprise-Policy",
+              "_layer": "IPv4 Policy"
+            },
+            {
+              "uid": "fg-rule-0006",
+              "rule-number": "6",
+              "name": "Stealth Rule",
+              "enabled": true,
+              "source": [{"name": "Any"}],
+              "destination": [{"name": "FG_Mgmt"}],
+              "service": [{"name": "Any"}],
+              "action": {"name": "deny"},
+              "track": {"type": "Log All"},
+              "install-on": {"name": "FG-200E"},
+              "time": {"name": "Always"},
+              "user": {"name": "Any"},
+              "comments": "Block direct access to firewall management interface",
+              "_rule-type": "firewall",
+              "_policy-name": "FG-Enterprise-Policy",
+              "_layer": "IPv4 Policy",
+              "source-interface": "Any",
+              "destination-interface": "Any"
+            },
+            {
+              "uid": "fg-rule-0007",
+              "rule-number": "7",
+              "name": "Cleanup Rule",
+              "enabled": true,
+              "source": [{"name": "Any"}],
+              "destination": [{"name": "Any"}],
+              "service": [{"name": "Any"}],
+              "action": {"name": "deny"},
+              "track": {"type": "Log All"},
+              "install-on": {"name": "FG-200E"},
+              "time": {"name": "Always"},
+              "user": {"name": "Any"},
+              "comments": "Default deny all unmatched traffic",
+              "_rule-type": "firewall",
+              "_policy-name": "FG-Enterprise-Policy",
+              "_layer": "IPv4 Policy"
+            }
+          ],
+          "inline-layers": []
+        }
+      ]
+    },
+    "nat-policy": {
+      "rules": [
+        {
+          "uid": "fg-nat-0001",
+          "rule-number": "1",
+          "name": "Source NAT to Internet",
+          "enabled": true,
+          "method": "dynamic-ip-and-port",
+          "original-source": [{"name": "Internal_Net"}],
+          "original-destination": [{"name": "External_Net"}],
+          "original-service": [{"name": "Any"}],
+          "translated-source": [{"name": "FG_Public_IP"}],
+          "translated-destination": [{"name": "Original"}],
+          "translated-service": [{"name": "Original"}],
+          "action": {"name": "snat"},
+          "install-on": {"name": "FG-200E"},
+          "comments": "MASQ internal traffic to internet via public IP",
+          "meta-info": {
+            "creation-time": {"iso": "2026-01-01T00:00:00Z"},
+            "last-modified": {"iso": "2026-01-01T00:00:00Z"}
+          }
+        },
+        {
+          "uid": "fg-nat-0002",
+          "rule-number": "2",
+          "name": "Port Forwarding Web",
+          "enabled": true,
+          "method": "static",
+          "original-source": [{"name": "Any"}],
+          "original-destination": [{"name": "FG_Public_IP"}],
+          "original-service": [{"name": "HTTPS"}],
+          "translated-source": [{"name": "Original"}],
+          "translated-destination": [{"name": "Internal_AppServer"}],
+          "translated-service": [{"name": "Original"}],
+          "action": {"name": "dnat"},
+          "install-on": {"name": "FG-200E"},
+          "comments": "Port forwarding HTTPS to internal application server",
+          "meta-info": {
+            "creation-time": {"iso": "2026-02-01T08:00:00Z"},
+            "last-modified": {"iso": "2026-02-01T08:00:00Z"}
+          }
+        }
+      ]
+    }
+  },
+  "objects": {
+    "hosts": [
+      {"name": "Internal_AppServer", "ip-address": "10.0.1.50", "type": "ipmask"},
+      {"name": "Mail_Server1", "ip-address": "10.0.2.5", "type": "ipmask"},
+      {"name": "Mail_Server2", "ip-address": "10.0.2.6", "type": "ipmask"},
+      {"name": "FG-200E", "ip-address": "192.168.1.254", "type": "ipmask"},
+      {"name": "FG_Public_IP", "ip-address": "203.0.113.5", "type": "ipmask"},
+      {"name": "FG_Mgmt", "ip-address": "192.168.0.254", "type": "ipmask"},
+      {"name": "BadIP_1", "ip-address": "198.51.100.1", "type": "ipmask"},
+      {"name": "BadIP_2", "ip-address": "198.51.100.2", "type": "ipmask"}
+    ],
+    "networks": [
+      {"name": "Internal_Net", "subnet": "10.0.0.0", "mask-length": 16},
+      {"name": "DMZ_Net", "subnet": "10.0.3.0", "mask-length": 24},
+      {"name": "External_Net", "subnet": "0.0.0.0", "mask-length": 0},
+      {"name": "VPN_Pool", "subnet": "172.16.100.0", "mask-length": 24}
+    ],
+    "groups": [
+      {"name": "Mail_Servers", "members": [{"name": "Mail_Server1"}, {"name": "Mail_Server2"}]},
+      {"name": "Blacklist_IPs", "members": [{"name": "BadIP_1"}, {"name": "BadIP_2"}]}
+    ],
+    "services": [
+      {"name": "HTTP", "protocol": "tcp", "port": "80"},
+      {"name": "HTTPS", "protocol": "tcp", "port": "443"},
+      {"name": "DNS", "protocol": "udp", "port": "53"},
+      {"name": "SMTP", "protocol": "tcp", "port": "25"},
+      {"name": "SMTPS", "protocol": "tcp", "port": "465"},
+      {"name": "TCP_8080", "protocol": "tcp", "port": "8080"},
+      {"name": "PING", "protocol": "icmp", "icmp-type": "8", "icmp-code": "0"}
+    ],
+    "application-sites": [
+      {"name": "web-browsing", "category": "general.web", "risk": "1"},
+      {"name": "ssl", "category": "tunnel", "risk": "1"},
+      {"name": "dns", "category": "network.service", "risk": "1"},
+      {"name": "smtp", "category": "email", "risk": "2"}
+    ],
+    "users": [
+      {"name": "remote-users", "type": "group"},
+      {"name": "admin", "type": "local"}
+    ],
+    "time-objects": [
+      {"name": "Always", "type": "always"},
+      {"name": "WorkHours", "start-time": "09:00", "end-time": "17:00", "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]}
+    ]
+  },
+  "_vendor": "fortinet"
+}
