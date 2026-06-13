@@ -2,6 +2,7 @@ import json
 import csv
 import sys
 import os
+import argparse
 
 
 class ObjectResolver:
@@ -346,62 +347,42 @@ def _split_rows(flat_rules, fields_wanted):
 
 
 def main():
-    split_mode = False
-    split_groups = False
-    nat_mode = False
+    parser = argparse.ArgumentParser(
+        description="Convert Checkpoint policy JSON to CSV.")
+    parser.add_argument("--split", action="store_true",
+                        help="Expand multi-source/multi-destination access rules into one row per pair")
+    parser.add_argument("--split-groups", action="store_true",
+                        help="Expand group objects into individual members before resolving IPs")
+    parser.add_argument("--nat", action="store_true",
+                        help="Extract NAT rules instead of access/HTTPS/threat rules")
+    parser.add_argument("--output", default=None,
+                        help="Output CSV file (default: outputs/<json_file>_v6.csv or _nat.csv)")
+    parser.add_argument("json_file", help="Input JSON policy file")
+    parser.add_argument("fields", help="Comma-separated list of fields to include")
+    args = parser.parse_args()
 
-    SKIP = {'--split', '--split-groups', '--nat'}
-    args = [a for a in sys.argv[1:] if a not in SKIP]
-    if '--split' in sys.argv:
-        split_mode = True
-    if '--split-groups' in sys.argv:
-        split_groups = True
-    if '--nat' in sys.argv:
-        nat_mode = True
+    split_mode = args.split
+    split_groups = args.split_groups
+    nat_mode = args.nat
 
-    if len(args) != 2:
-        print("Usage: python convert_checkpoint_v6.py [--split] [--split-groups] [--nat] <json_file> <field1,field2,...>")
-        print()
-        print("Access rule fields:")
-        print("  rule-number, name, rule-type, policy-name, status, enabled,")
-        print("  source, source-ips, destination, destination-ips,")
-        print("  service, service-ports, action, track, comments,")
-        print("  content, inline-layer, time, user, install-on,")
-        print("  threat-name, threat-category, site-category, certificate,")
-        print("  uid, hits, creation-time, last-modified, _layer")
-        print()
-        print("NAT rule fields (--nat):")
-        print("  rule-number, name, status, method, action, install-on, comments,")
-        print("  original-source, original-source-ips,")
-        print("  original-destination, original-destination-ips,")
-        print("  original-service, original-service-ports,")
-        print("  translated-source, translated-source-ips,")
-        print("  translated-destination, translated-destination-ips,")
-        print("  translated-service, translated-service-ports,")
-        print("  uid, hits, creation-time, last-modified")
-        print()
-        print("  rule-type: access | inline | app-control | threat-prevention | https-inspection")
-        print("  status:    Enabled | Disabled")
-        print()
-        print("Options:")
-        print("  --split         Expand multi-source/multi-destination access rules into")
-        print("                  one row per source-destination pair")
-        print("  --split-groups  Expand group objects into their individual member objects")
-        print("                  before resolving IPs (composes with --split)")
-        print("  --nat           Extract NAT rules instead of access/HTTPS/threat rules")
-        print()
-        print("Examples:")
-        print('  python convert_checkpoint_v6.py checkpoint_policy.json "rule-number,status,name,source,destination"')
-        print('  python convert_checkpoint_v6.py --split checkpoint_policy.json "rule-number,status,name,source,destination"')
-        print('  python convert_checkpoint_v6.py --nat checkpoint_policy.json "rule-number,name,method,original-source,translated-source"')
-        sys.exit(1)
-
-    json_file = args[0]
-    fields = [f.strip() for f in args[1].split(',')]
+    json_file = args.json_file
+    fields = [f.strip() for f in args.fields.split(',')]
 
     if not os.path.exists(json_file):
         print(f"Error: File '{json_file}' not found.")
         sys.exit(1)
+
+    suffix = '_nat.csv' if nat_mode else '_v6.csv'
+    default_name = os.path.splitext(os.path.basename(json_file))[0] + suffix
+    output = args.output
+    if output is None:
+        default_path = os.path.join("outputs", default_name)
+        user_path = input(f"Save path [{default_path}]: ").strip()
+        output = user_path or default_path
+
+    out_dir = os.path.dirname(output)
+    if out_dir and not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
 
     with open(json_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -431,9 +412,6 @@ def main():
     for f in fields:
         if f not in known:
             print(f"Warning: '{f}' is not a recognized field.")
-
-    suffix = '_nat.csv' if nat_mode else '_v6.csv'
-    output = os.path.splitext(json_file)[0] + suffix
 
     with open(output, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')

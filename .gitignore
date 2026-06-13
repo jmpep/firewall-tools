@@ -61,3 +61,6 @@ terraform.tfplan
 terraform.tfstate
 terraform.tfvars
 .terraform.tfstate.lock.info
+
+#do not save the csv and json default in outputs
+/outputs

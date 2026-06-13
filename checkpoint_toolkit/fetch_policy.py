@@ -227,8 +227,8 @@ def main():
     parser.add_argument("--password", help="Password (omit for prompt)")
     parser.add_argument("--port", type=int, default=443,
                         help="API port (default 443)")
-    parser.add_argument("--output", default="checkpoint_policy.json",
-                        help="Output JSON file")
+    parser.add_argument("--output", default=None,
+                        help="Output JSON file (default: outputs/<policy_name>.json)")
     parser.add_argument("--ssl-verify", action="store_true",
                         help="Verify SSL certificate")
     args = parser.parse_args()
@@ -238,13 +238,23 @@ def main():
         import getpass
         password = getpass.getpass("Password: ")
 
+    output = args.output
+    if output is None:
+        default = "outputs/checkpoint_policy.json"
+        user_path = input(f"Save path [{default}]: ").strip()
+        output = user_path or default
+
+    out_dir = os.path.dirname(output)
+    if out_dir and not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+
     print(f"Connecting to {args.server}:{args.port} as {args.username} ...")
     client = CheckpointAPIClient(args.server, args.username, password,
                                  port=args.port, verify=args.ssl_verify)
     data = client.fetch_all()
     client.logout()
 
-    with open(args.output, "w", encoding="utf-8") as f:
+    with open(output, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, default=str)
 
     total_rules = sum(
@@ -253,7 +263,7 @@ def main():
     )
     obj_count = sum(len(v) for v in data.get("objects", {}).values())
 
-    print(f"\nSaved to '{args.output}'")
+    print(f"\nSaved to '{output}'")
     print(f"  Access layers : {len(data['policy-package']['access-control-policy']['layers'])}")
     print(f"  Access rules  : {total_rules}")
     print(f"  HTTPS rules   : {len(data['policy-package']['https-inspection-policy']['rules'])}")

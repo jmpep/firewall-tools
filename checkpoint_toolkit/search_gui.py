@@ -1029,8 +1029,22 @@ class SearchGUI:
                 data = _sanitize(data)
                 status_var.set("Saving ...")
                 dlg.update()
-                fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="checkpoint_")
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                out_dir = "outputs"
+                if not os.path.exists(out_dir):
+                    os.makedirs(out_dir, exist_ok=True)
+                default_name = f"checkpoint_policy.json"
+                save_path = filedialog.asksaveasfilename(
+                    title="Save policy as",
+                    initialdir=os.path.abspath(out_dir),
+                    initialfile=default_name,
+                    defaultextension=".json",
+                    filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+                if not save_path:
+                    status_var.set("Save cancelled.")
+                    download_btn.config(state=tk.NORMAL)
+                    connect_btn.config(state=tk.NORMAL)
+                    return
+                with open(save_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2, default=str)
 
             except (SystemExit, Exception) as e:
@@ -1048,7 +1062,7 @@ class SearchGUI:
             status_var.set("Loading into GUI ...")
             dlg.update()
             dlg.destroy()
-            self._load(tmp_path)
+            self._load(save_path)
 
         connect_btn.config(command=_do_connect)
         download_btn.config(command=_do_download)

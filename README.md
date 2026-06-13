@@ -7,6 +7,7 @@ Multi-tool suite to convert, fetch, and search Checkpoint firewall policies.
 ```
 convert_Checkpoint_json/
 ├── checkpoint_policy.json        # example policy
+├── outputs/                      # saved policies & CSVs (auto-created)
 ├── .gitignore
 ├── LICENSE                       # MIT
 ├── README.md                     # root docs
@@ -27,12 +28,10 @@ convert_Checkpoint_json/
         └── convert_checkpoint_v6.py
 ```
 
-```
-
 ## Quick start
 
 ```bash
-# CSV conversion (latest version)
+# CSV conversion (latest version) — prompts for save path, defaults to outputs/
 python firewall-import\convert_checkpoint.py checkpoint_policy.json "rule-number,status,name,source,source-ips,destination,destination-ips,service,service-ports,action"
 
 # NAT rules
@@ -40,6 +39,9 @@ python firewall-import\convert_checkpoint.py --nat checkpoint_policy.json "rule-
 
 # Browse GUI
 python checkpoint_toolkit\search_gui.py checkpoint_policy.json
+
+# Download policy from live server — prompts for save path, defaults to outputs/
+python checkpoint_toolkit\fetch_policy.py --server 192.168.1.1 --username admin
 ```
 
 ## Documentation
