@@ -1,0 +1,63 @@
+*.exe
+.DS_Store
+*.log
+*.bak
+*.backup
+*.~
+*.tmp
+*.swp
+
+#from Python
+# --- Python cache ---
+__pycache__/
+*.py[cod]
+*.pyo
+# --- Virtual environments ---
+venv/
+.env/
+.venv/
+# --- Build / packaging ---
+build/
+dist/
+*.egg-info/
+# --- Temporary & state files ---
+# Python
+# Generated CSVs
+*.csv
+# IDE
+
+.vscode/
+.idea/
+*.swo
+
+# OS
+Thumbs.db
+
+# Environment
+.envrc
+*.tmp
+# --- IDE / Editor ---
+
+# PyCharm
+
+# VS Code
+
+# --- OS junk ---
+
+#divers
+PROMPT.md
+
+#for terraform
+/bin
+moduledev/
+pkg/
+vendor/
+.idea
+.vscode
+.env
+./*.tfstate
+.terraform
+terraform.tfplan
+terraform.tfstate
+terraform.tfvars
+.terraform.tfstate.lock.info
