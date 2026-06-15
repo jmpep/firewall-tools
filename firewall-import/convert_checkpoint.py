@@ -4,7 +4,6 @@ import sys
 import os
 import argparse
 
-
 class ObjectResolver:
     def __init__(self, objects_data):
         self._hosts = {}

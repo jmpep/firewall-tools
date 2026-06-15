@@ -9,6 +9,7 @@ Tools to export, convert, and search Checkpoint firewall policies.
 | `../firewall-import/convert_checkpoint.py` | Convert JSON policy → CSV with field selection, split modes, NAT (older versions in `history/`) |
 | `fetch_policy.py` | Fetch live policy from Checkpoint Management API → JSON (pagination for 5000+ objects) |
 | `search_gui.py` | Tkinter GUI to browse and search exported JSON policies with export |
+| `utils.py` | Settings persistence (`settings.yaml`) + logging to `logs/firewall_tools.log` |
 
 ## Quick start
 
@@ -147,9 +148,16 @@ so wide column sets (IP sub-columns, ports, timestamps) are reachable.
 
 ### Download from Live Server
 - **Download** button in toolbar (requires `fetch_policy.py` in toolkit directory)
-- Credential dialog → Connect & Fetch Layers → checkboxes per layer → Download & Load
-- Fetches selected layers + HTTPS inspection + threat prevention + all objects
-- Saves to tempfile, loads into GUI
+- Credential dialog (last values restored from `settings.yaml`) → Connect & Fetch Layers → checkboxes per layer → Download & Load
+- If no layers selected, the policy name field is used as the layer name to download
+- Saves with auto-generated name `{server}_{policy}_{date}.json` to the configured output directory
+- Loads the saved file into GUI
+
+### Settings
+- ⚙ **Settings** button in toolbar
+- Configure page size (default 200), timeout (default 300s), log level, download directory
+- Reset log file button
+- All settings persisted in `settings.yaml` and restored on next launch
 
 ## Version history
 
@@ -164,6 +172,8 @@ so wide column sets (IP sub-columns, ports, timestamps) are reachable.
 - **v9** — IP/port sub-columns in converter + GUI; Split/Split Groups checkboxes in GUI
 - **v10** — Fixed column alignment (IP/port sub-columns now show correct data); hierarchical rule numbering for inline rules in GUI
 - **v11** — Full pagination in `fetch_policy.py` for all rulebases and object types (5000+ objects, 1000+ rules)
+- **v12** — Multi-vendor support (Palo Alto, Fortinet), `rule-id` column, vendor dropdown in GUI download dialog
+- **v13** — Settings persistence (`settings.yaml` with JSON format), configurable page size (default 200), logging to `logs/firewall_tools.log`, log level control, auto-named download files, auto-reload last connection values, no-layer fallback to policy name field, output directory field
 
 ## License
 

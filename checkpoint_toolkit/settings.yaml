@@ -1,0 +1,7 @@
+{
+  "timeout": 300,
+  "page_size": 200,
+  "download_dir": "examples",
+  "log_level": "INFO",
+  "language": "en"
+}

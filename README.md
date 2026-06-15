@@ -14,6 +14,7 @@ convert_Checkpoint_json/
 ├── checkpoint_toolkit/
 │   ├── fetch_policy.py           # live API fetcher (paginated)
 │   ├── search_gui.py             # Tkinter GUI
+│   ├── utils.py                  # settings persistence + logging
 │   ├── JMPEP-logo.png
 │   ├── PROMPT.md                 # project prompt
 │   └── README.md                 # toolkit docs

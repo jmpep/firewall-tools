@@ -6,7 +6,7 @@ import sys
 import os
 import csv
 import time
-import tempfile
+import logging
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
@@ -15,6 +15,11 @@ try:
     HAS_FETCH = True
 except ImportError:
     HAS_FETCH = False
+
+from utils import load_settings, save_settings, setup_logging, reset_log, DEFAULT_LOG_LEVEL
+from lang import L, set_language
+
+logger = logging.getLogger(__name__)
 
 
 # ==================================================================== pattern
@@ -334,7 +339,7 @@ class SearchGUI:
 
     def __init__(self, root, initial_file=None):
         self.root = root
-        root.title("Checkpoint Policy Search")
+        root.title(L("app.title"))
         root.geometry("1300x800")
 
         self.data = None
@@ -344,24 +349,64 @@ class SearchGUI:
         self.all_rules = []
         self.all_nat_rules = []
 
+        settings = load_settings()
+        self.page_size = settings.get("page_size", 200)
+        self.timeout = settings.get("timeout", 300)
+        self.log_level_name = settings.get("log_level", DEFAULT_LOG_LEVEL)
+        self.download_dir = settings.get("download_dir", "examples")
+        lang_code = settings.get("language", "en")
+        set_language(lang_code)
+
+        setup_logging(self.log_level_name)
+        logging.info("GUI started (lang=%s)", lang_code)
+
         # ---- menu
-        menubar = tk.Menu(root)
-        filemenu = tk.Menu(menubar, tearoff=0)
-        filemenu.add_command(label="Open JSON ...", command=self.open_file)
-        filemenu.add_separator()
-        filemenu.add_command(label="Exit", command=root.quit)
-        menubar.add_cascade(label="File", menu=filemenu)
-        root.config(menu=menubar)
+        self.menubar = tk.Menu(root)
+        self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        self.filemenu.add_command(label=L("menu.open"), command=self.open_file)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label=L("menu.exit"), command=self._on_quit)
+        self.menubar.add_cascade(label=L("menu.file"), menu=self.filemenu)
+        root.config(menu=self.menubar)
+        root.protocol("WM_DELETE_WINDOW", self._on_quit)
 
         # ---- toolbar
+        self._lang_widgets = []
         toolbar = ttk.Frame(root)
         toolbar.pack(fill=tk.X, padx=5, pady=3)
-        ttk.Label(toolbar, text="File:").pack(side=tk.LEFT)
-        self.file_label = ttk.Label(toolbar, text="(none)", foreground="gray")
+        w = ttk.Label(toolbar, text=L("tb.file_label")); w.pack(side=tk.LEFT)
+        self._lang_widgets.append((w, "tb.file_label"))
+        self.file_label = ttk.Label(toolbar, text=L("group.none"), foreground="gray")
         self.file_label.pack(side=tk.LEFT, padx=5)
-        ttk.Button(toolbar, text="Open", command=self.open_file).pack(side=tk.LEFT, padx=2)
+        w = ttk.Button(toolbar, text=L("tb.open"), command=self.open_file); w.pack(side=tk.LEFT, padx=2)
+        self._lang_widgets.append((w, "tb.open"))
         if HAS_FETCH:
-            ttk.Button(toolbar, text="Download Policy from Firewall", command=self._download_dialog).pack(side=tk.LEFT, padx=2)
+            self.dl_btn = ttk.Button(toolbar, text=L("tb.download"), command=self._download_dialog)
+            self.dl_btn.pack(side=tk.LEFT, padx=2)
+            self._lang_widgets.append((self.dl_btn, "tb.download"))
+        self.settings_btn = ttk.Button(toolbar, text=L("tb.settings"), command=self._settings_dialog)
+        self.settings_btn.pack(side=tk.RIGHT, padx=2)
+        self._lang_widgets.append((self.settings_btn, "tb.settings"))
+        w = ttk.Label(toolbar, text=L("tb.lang")); w.pack(side=tk.RIGHT, padx=(2, 0))
+        self._lang_widgets.append((w, "tb.lang"))
+        self._lang_btns = {}
+        img_dir = os.path.join(os.path.dirname(__file__), "images")
+        self._flag_images = {}
+        for code in ("en", "fr", "de", "it", "sk"):
+            btn = tk.Button(toolbar, text=code.upper(), width=4,
+                            command=lambda c=code: self._select_language(c), padx=0, pady=0)
+            btn.pack(side=tk.RIGHT, padx=1)
+            img_path = os.path.join(img_dir, f"{code}.png")
+            if os.path.exists(img_path):
+                try:
+                    img = tk.PhotoImage(file=img_path)
+                    self._flag_images[code] = img
+                    btn.config(image=img, text="", width=28, height=18)
+                except tk.TclError:
+                    pass
+            self._lang_btns[code] = btn
+        self._highlight_lang(L.code)
+        self._lang_init_code = None  # avoid redundant save on startup
 
         # ---- banner
         banner = tk.Frame(root, bg="#1a3a5c", height=56)
@@ -387,31 +432,32 @@ class SearchGUI:
 
         info_frame = tk.Frame(banner, bg="#1a3a5c")
         info_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, pady=4)
-        tk.Label(info_frame, text="Firewall Policy Toolkit"+" Checkpoint/Fortinet/PaloAlto",
+        self.banner_title = tk.Label(info_frame, text=L("banner.title"),
                  bg="#1a3a5c", fg="white",
-                 font=("Helvetica", 13, "bold")).pack(anchor=tk.W)
-        tk.Label(info_frame,
-                 text="v12  •  5000+ objects  •  1000+ rules  •  enjoy and give me feedback. Your friend Jean-Michel",
+                 font=("Helvetica", 13, "bold"))
+        self.banner_title.pack(anchor=tk.W)
+        self.banner_sub = tk.Label(info_frame, text=L("banner.subtitle"),
                  bg="#1a3a5c", fg="#8ab4d6",
-                 font=("Helvetica", 8)).pack(anchor=tk.W)
+                 font=("Helvetica", 8))
+        self.banner_sub.pack(anchor=tk.W)
 
         # ---- notebook
-        nb = ttk.Notebook(root)
-        nb.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.nb = ttk.Notebook(root)
+        self.nb.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # -- object search tab
-        obj_frame = ttk.Frame(nb)
-        nb.add(obj_frame, text="Objects")
+        obj_frame = ttk.Frame(self.nb)
+        self.nb.add(obj_frame, text=L("tab.objects"))
         self._build_object_tab(obj_frame)
 
         # -- rule search tab
-        rule_frame = ttk.Frame(nb)
-        nb.add(rule_frame, text="Rules")
+        rule_frame = ttk.Frame(self.nb)
+        self.nb.add(rule_frame, text=L("tab.rules"))
         self._build_rule_tab(rule_frame)
 
-        # -- NAT tab
-        nat_frame = ttk.Frame(nb)
-        nb.add(nat_frame, text="NAT Rules")
+        # -- nat search tab
+        nat_frame = ttk.Frame(self.nb)
+        self.nb.add(nat_frame, text=L("tab.nat"))
         self._build_nat_tab(nat_frame)
 
         # -- load file if given
@@ -423,12 +469,14 @@ class SearchGUI:
     def _build_object_tab(self, parent):
         top = ttk.Frame(parent)
         top.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(top, text="Search:").pack(side=tk.LEFT)
+        w = ttk.Label(top, text=L("search.placeholder")); w.pack(side=tk.LEFT)
+        self._lang_widgets.append((w, "search.placeholder"))
         self.obj_search_var = tk.StringVar()
         self.obj_search_var.trace_add('write', lambda *a: self._do_obj_search())
         e = ttk.Entry(top, textvariable=self.obj_search_var, width=60)
         e.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        ttk.Label(top, text="  Space = AND,  * = any,  . = single char").pack(side=tk.LEFT)
+        w = ttk.Label(top, text=L("search.hint_objects")); w.pack(side=tk.LEFT)
+        self._lang_widgets.append((w, "search.hint_objects"))
         self.obj_count_label = ttk.Label(top, text="")
         self.obj_count_label.pack(side=tk.RIGHT, padx=5)
 
@@ -439,11 +487,12 @@ class SearchGUI:
         self.obj_tree = ttk.Treeview(tree_frame, columns=c, show='headings',
                                      selectmode='extended')
         for col in c:
-            self.obj_tree.heading(col, text=col, command=lambda _c=col: self._sort(self.obj_tree, _c, False))
+            self.obj_tree.heading(col, text=L("col." + col), command=lambda _c=col: self._sort(self.obj_tree, _c, False))
             self.obj_tree.column(col, width=120, minwidth=60)
         self.obj_tree.column("name", width=180)
         self.obj_tree.column("comments", width=200)
         self.obj_tree.column("_objtype", width=100)
+        self.obj_tree._col_lang_key = "col."  # marker for language refresh
 
         vsb = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.obj_tree.yview)
         hsb = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.obj_tree.xview)
@@ -461,7 +510,7 @@ class SearchGUI:
         self.obj_tree.delete(*self.obj_tree.get_children())
         raw = self.obj_search_var.get().strip()
         if not raw or not self.all_objects:
-            self.obj_count_label.config(text=f"{len(self.all_objects)} objects")
+            self.obj_count_label.config(text=L("search.count_objects", n=len(self.all_objects)))
             if self.all_objects:
                 for o in self.all_objects:
                     self.obj_tree.insert('', tk.END, values=self._obj_vals(o))
@@ -475,7 +524,7 @@ class SearchGUI:
 
         for o in matched:
             self.obj_tree.insert('', tk.END, values=self._obj_vals(o))
-        self.obj_count_label.config(text=f"{len(matched)} / {len(self.all_objects)}")
+        self.obj_count_label.config(text=L("search.count_matched", n=len(matched), total=len(self.all_objects)))
 
     def _obj_vals(self, o):
         return tuple(o.get(c, '') for c in self.OBJ_COLS)
@@ -492,34 +541,40 @@ class SearchGUI:
         item = self.obj_tree.item(sel[0])
         vals = {c: v for c, v in zip(self.OBJ_COLS, item['values'])}
         msg = json.dumps(vals, indent=2, ensure_ascii=False)
-        messagebox.showinfo("Object detail", msg)
+        messagebox.showinfo(L("detail.object"), msg)
 
     # ============================================================ rule tab
 
     def _build_rule_tab(self, parent):
         top = ttk.Frame(parent)
         top.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(top, text="Search:").pack(side=tk.LEFT)
+        w = ttk.Label(top, text=L("search.placeholder")); w.pack(side=tk.LEFT)
+        self._lang_widgets.append((w, "search.placeholder"))
         self.rule_search_var = tk.StringVar()
         self.rule_search_var.trace_add('write', lambda *a: self._do_rule_search())
         e = ttk.Entry(top, textvariable=self.rule_search_var, width=60)
         e.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        ttk.Label(top, text="  field:value AND / OR   (* = any, . = single char)").pack(side=tk.LEFT)
+        w = ttk.Label(top, text=L("search.hint_rules")); w.pack(side=tk.LEFT)
+        self._lang_widgets.append((w, "search.hint_rules"))
         self.rule_count_label = ttk.Label(top, text="")
         self.rule_count_label.pack(side=tk.RIGHT, padx=5)
 
         btn_frame = ttk.Frame(parent)
         btn_frame.pack(fill=tk.X, padx=5, pady=2)
-        ttk.Button(btn_frame, text="Export All to CSV",
-                   command=self._export_rule_all).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="Export Searched to CSV",
-                   command=self._export_rule_searched).pack(side=tk.LEFT, padx=2)
+        w = ttk.Button(btn_frame, text=L("export.all_csv"),
+                   command=self._export_rule_all); w.pack(side=tk.LEFT, padx=2)
+        self._lang_widgets.append((w, "export.all_csv"))
+        w = ttk.Button(btn_frame, text=L("export.searched_csv"),
+                   command=self._export_rule_searched); w.pack(side=tk.LEFT, padx=2)
+        self._lang_widgets.append((w, "export.searched_csv"))
         self.split_var = tk.BooleanVar()
         self.split_groups_var = tk.BooleanVar()
-        ttk.Checkbutton(btn_frame, text="Split", variable=self.split_var,
-                        command=self._do_rule_search).pack(side=tk.LEFT, padx=5)
-        ttk.Checkbutton(btn_frame, text="Split Groups", variable=self.split_groups_var,
-                        command=self._do_rule_search).pack(side=tk.LEFT, padx=2)
+        w = ttk.Checkbutton(btn_frame, text=L("split.split"), variable=self.split_var,
+                        command=self._do_rule_search); w.pack(side=tk.LEFT, padx=5)
+        self._lang_widgets.append((w, "split.split"))
+        w = ttk.Checkbutton(btn_frame, text=L("split.groups"), variable=self.split_groups_var,
+                        command=self._do_rule_search); w.pack(side=tk.LEFT, padx=2)
+        self._lang_widgets.append((w, "split.groups"))
 
         tree_frame = ttk.Frame(parent)
         tree_frame.pack(fill=tk.BOTH, expand=True)
@@ -528,7 +583,7 @@ class SearchGUI:
         self.rule_tree = ttk.Treeview(tree_frame, columns=c, show='headings',
                                       selectmode='extended')
         for col in c:
-            self.rule_tree.heading(col, text=col, command=lambda _c=col: self._sort(self.rule_tree, _c, False))
+            self.rule_tree.heading(col, text=L("col." + col), command=lambda _c=col: self._sort(self.rule_tree, _c, False))
             self.rule_tree.column(col, width=110, minwidth=60)
         self.rule_tree.column("rule-id", width=160)
         self.rule_tree.column("name", width=220)
@@ -538,6 +593,7 @@ class SearchGUI:
         self.rule_tree.column("destination-ips", width=180)
         self.rule_tree.column("service-ports", width=150)
         self.rule_tree.column("comments", width=200)
+        self.rule_tree._col_lang_key = "col."
 
         vsb = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.rule_tree.yview)
         hsb = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.rule_tree.xview)
@@ -563,7 +619,7 @@ class SearchGUI:
             self.rule_tree.insert('', tk.END, values=tuple(f.values()))
         count = len(children)
         total = len(all_flat)
-        self.rule_count_label.config(text=f"{count} / {total}" if raw else str(total))
+        self.rule_count_label.config(text=L("search.count_rules", n=count, total=total) if raw else L("search.count_total_rules", n=total))
 
     def _get_rule_display_rows(self):
         """Return flat dicts for display, respecting split/split-groups."""
@@ -628,13 +684,13 @@ class SearchGUI:
 
     def _export_to_csv(self, rows, default_name):
         if not rows:
-            messagebox.showinfo("Export", "No data to export.")
+            messagebox.showinfo(L("export.title"), L("export.no_data"))
             return
         path = filedialog.asksaveasfilename(
-            title="Export to CSV",
+            title=L("export.save_title"),
             defaultextension=".csv",
             initialfile=default_name,
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
+            filetypes=[(L("export.filter_csv"), "*.csv"), (L("export.filter_all"), "*.*")])
         if not path:
             return
         try:
@@ -642,9 +698,9 @@ class SearchGUI:
                 writer = csv.DictWriter(f, fieldnames=rows[0].keys())
                 writer.writeheader()
                 writer.writerows(rows)
-            messagebox.showinfo("Export", f"Exported {len(rows)} rows to {os.path.basename(path)}")
+            messagebox.showinfo(L("export.title"), L("export.exported", count=len(rows), path=os.path.basename(path)))
         except Exception as e:
-            messagebox.showerror("Export error", str(e))
+            messagebox.showerror(L("export.error"), str(e))
 
     def _build_group_lookup(self):
         """Populate self._groups with group-type objects for expand_groups."""
@@ -691,28 +747,32 @@ class SearchGUI:
         item = self.rule_tree.item(sel[0])
         vals = {c: v for c, v in zip(self.RULE_COLS, item['values'])}
         msg = json.dumps(vals, indent=2, ensure_ascii=False)
-        messagebox.showinfo("Rule detail", msg)
+        messagebox.showinfo(L("detail.rule"), msg)
 
     # ============================================================ NAT tab
 
     def _build_nat_tab(self, parent):
         top = ttk.Frame(parent)
         top.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(top, text="Search:").pack(side=tk.LEFT)
+        w = ttk.Label(top, text=L("search.placeholder")); w.pack(side=tk.LEFT)
+        self._lang_widgets.append((w, "search.placeholder"))
         self.nat_search_var = tk.StringVar()
         self.nat_search_var.trace_add('write', lambda *a: self._do_nat_search())
         e = ttk.Entry(top, textvariable=self.nat_search_var, width=60)
         e.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        ttk.Label(top, text="  field:value AND / OR   (* = any, . = single char)").pack(side=tk.LEFT)
+        w = ttk.Label(top, text=L("search.hint_rules")); w.pack(side=tk.LEFT)
+        self._lang_widgets.append((w, "search.hint_rules"))
         self.nat_count_label = ttk.Label(top, text="")
         self.nat_count_label.pack(side=tk.RIGHT, padx=5)
 
         btn_frame = ttk.Frame(parent)
         btn_frame.pack(fill=tk.X, padx=5, pady=2)
-        ttk.Button(btn_frame, text="Export All to CSV",
-                   command=self._export_nat_all).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="Export Searched to CSV",
-                   command=self._export_nat_searched).pack(side=tk.LEFT, padx=2)
+        w = ttk.Button(btn_frame, text=L("export.all_csv"),
+                   command=self._export_nat_all); w.pack(side=tk.LEFT, padx=2)
+        self._lang_widgets.append((w, "export.all_csv"))
+        w = ttk.Button(btn_frame, text=L("export.searched_csv"),
+                   command=self._export_nat_searched); w.pack(side=tk.LEFT, padx=2)
+        self._lang_widgets.append((w, "export.searched_csv"))
 
         tree_frame = ttk.Frame(parent)
         tree_frame.pack(fill=tk.BOTH, expand=True)
@@ -721,7 +781,7 @@ class SearchGUI:
         self.nat_tree = ttk.Treeview(tree_frame, columns=c, show='headings',
                                      selectmode='extended')
         for col in c:
-            self.nat_tree.heading(col, text=col, command=lambda _c=col: self._sort(self.nat_tree, _c, False))
+            self.nat_tree.heading(col, text=L("col." + col), command=lambda _c=col: self._sort(self.nat_tree, _c, False))
             self.nat_tree.column(col, width=120, minwidth=60)
         self.nat_tree.column("rule-id", width=160)
         self.nat_tree.column("name", width=200)
@@ -735,6 +795,7 @@ class SearchGUI:
         self.nat_tree.column("translated-source-ips", width=150)
         self.nat_tree.column("translated-destination-ips", width=150)
         self.nat_tree.column("translated-service-ports", width=130)
+        self.nat_tree._col_lang_key = "col."
         self.nat_tree.column("comments", width=200)
 
         vsb = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.nat_tree.yview)
@@ -753,7 +814,7 @@ class SearchGUI:
         self.nat_tree.delete(*self.nat_tree.get_children())
         raw = self.nat_search_var.get().strip()
         if not raw or not self.all_nat_rules:
-            self.nat_count_label.config(text=f"{len(self.all_nat_rules)} NAT rules")
+            self.nat_count_label.config(text=L("search.count_nat", n=len(self.all_nat_rules)))
             for r in self.all_nat_rules:
                 self.nat_tree.insert('', tk.END,
                                      values=tuple(flatten_nat_for_display(r, self.lookup).values()))
@@ -763,7 +824,7 @@ class SearchGUI:
         for r in matched:
             self.nat_tree.insert('', tk.END,
                                  values=tuple(flatten_nat_for_display(r, self.lookup).values()))
-        self.nat_count_label.config(text=f"{len(matched)} / {len(self.all_nat_rules)}")
+        self.nat_count_label.config(text=L("search.count_matched", n=len(matched), total=len(self.all_nat_rules)))
 
     def _eval_nat_query(self, raw):
         def _clause_matches(rule, clause):
@@ -817,60 +878,215 @@ class SearchGUI:
         item = self.nat_tree.item(sel[0])
         vals = {c: v for c, v in zip(self.NAT_COLS, item['values'])}
         msg = json.dumps(vals, indent=2, ensure_ascii=False)
-        messagebox.showinfo("NAT rule detail", msg)
+        messagebox.showinfo(L("detail.nat"), msg)
+
+    # ============================================================ language
+
+    def _highlight_lang(self, code):
+        for c, btn in self._lang_btns.items():
+            btn.config(relief=tk.SUNKEN if c == code else tk.RAISED)
+
+    def _select_language(self, code):
+        if not self.root.winfo_exists():
+            return
+        if code == L.code and self._lang_init_code is None:
+            return
+        set_language(code)
+        self._highlight_lang(code)
+        self._apply_language()
+        save_settings({"language": code})
+
+    def _apply_language(self):
+        def _u(w, key=None, **kwargs):
+            try:
+                if key:
+                    w.config(text=L(key, **kwargs))
+                elif kwargs:
+                    w.config(**kwargs)
+            except tk.TclError:
+                pass
+
+        _u(self.root, title=L("app.title"))
+        _u(self.banner_title, "banner.title")
+        _u(self.banner_sub, "banner.subtitle")
+        for w, key in self._lang_widgets:
+            _u(w, key)
+        try:
+            self.filemenu.entryconfig(0, label=L("menu.open"))
+            self.filemenu.entryconfig(2, label=L("menu.exit"))
+            self.menubar.entryconfig(0, label=L("menu.file"))
+        except tk.TclError:
+            pass
+        try:
+            self.nb.tab(0, text=L("tab.objects"))
+            self.nb.tab(1, text=L("tab.rules"))
+            self.nb.tab(2, text=L("tab.nat"))
+        except tk.TclError:
+            pass
+        self._do_obj_search()
+        self._do_rule_search()
+        self._do_nat_search()
+        for tree in (self.obj_tree, self.rule_tree, self.nat_tree):
+            try:
+                prefix = getattr(tree, '_col_lang_key', '')
+                if prefix:
+                    for cid in tree['columns']:
+                        tree.heading(cid, text=L(prefix + cid))
+            except tk.TclError:
+                pass
+
+    # ============================================================ quit / persist
+
+    def _on_quit(self):
+        save_settings({
+            "timeout": self.timeout,
+            "page_size": self.page_size,
+            "download_dir": self.download_dir,
+            "log_level": self.log_level_name,
+            "language": L.code,
+        })
+        logging.info("GUI shutting down")
+        self.root.quit()
+        self.root.destroy()
+
+    # ============================================================ settings dialog
+
+    def _settings_dialog(self):
+        dlg = tk.Toplevel(self.root)
+        dlg.title(L("settings.title"))
+        dlg.geometry("400x360")
+        dlg.transient(self.root)
+        dlg.grab_set()
+        dlg.resizable(False, False)
+
+        cf = ttk.LabelFrame(dlg, text=L("settings.api"), padding=10)
+        cf.pack(fill=tk.X, padx=10, pady=(10, 0))
+
+        ttk.Label(cf, text=L("settings.page_size")).grid(row=0, column=0, sticky=tk.W, pady=4)
+        ps_var = tk.IntVar(value=self.page_size)
+        ttk.Scale(cf, from_=50, to=1000, variable=ps_var, orient=tk.HORIZONTAL).grid(row=0, column=1, padx=8, pady=4, sticky=tk.EW)
+        ttk.Label(cf, textvariable=ps_var, width=4).grid(row=0, column=2, padx=2, pady=4)
+
+        ttk.Label(cf, text=L("settings.timeout")).grid(row=1, column=0, sticky=tk.W, pady=4)
+        to_var = tk.IntVar(value=self.timeout)
+        ttk.Scale(cf, from_=30, to=600, variable=to_var, orient=tk.HORIZONTAL).grid(row=1, column=1, padx=8, pady=4, sticky=tk.EW)
+        ttk.Label(cf, textvariable=to_var, width=4).grid(row=1, column=2, padx=2, pady=4)
+
+        cf.columnconfigure(1, weight=1)
+
+        # -- log settings
+        lf = ttk.LabelFrame(dlg, text=L("settings.logging"), padding=10)
+        lf.pack(fill=tk.X, padx=10, pady=(10, 0))
+
+        ttk.Label(lf, text=L("settings.log_level")).grid(row=0, column=0, sticky=tk.W, pady=4)
+        lvl_var = tk.StringVar(value=self.log_level_name)
+        lvl_combo = ttk.Combobox(lf, textvariable=lvl_var,
+                                  values=["DEBUG", "INFO", "WARNING", "ERROR"],
+                                  state="readonly", width=12)
+        lvl_combo.grid(row=0, column=1, sticky=tk.W, padx=8, pady=4)
+
+        ttk.Label(lf, text=L("settings.download_dir")).grid(row=1, column=0, sticky=tk.W, pady=4)
+        dd_var = tk.StringVar(value=self.download_dir)
+        ttk.Entry(lf, textvariable=dd_var, width=30).grid(row=1, column=1, padx=8, pady=4, sticky=tk.EW)
+        lf.columnconfigure(1, weight=1)
+
+        reset_log_btn = ttk.Button(lf, text=L("settings.reset_log"))
+        reset_log_btn.grid(row=3, column=0, columnspan=2, pady=6)
+
+        def _do_reset_log():
+            reset_log()
+            messagebox.showinfo(L("settings.log_reset_title"), L("settings.log_reset_ok"), parent=dlg)
+
+        reset_log_btn.config(command=_do_reset_log)
+
+        def _apply():
+            self.page_size = ps_var.get()
+            self.timeout = to_var.get()
+            old_level = self.log_level_name
+            self.log_level_name = lvl_var.get()
+            self.download_dir = dd_var.get().strip() or "examples"
+            if self.log_level_name != old_level:
+                setup_logging(self.log_level_name)
+                logging.info("Log level changed to %s", self.log_level_name)
+            settings = {
+                "timeout": self.timeout,
+                "page_size": self.page_size,
+                "download_dir": self.download_dir,
+                "log_level": self.log_level_name,
+                "language": L.code,
+            }
+            save_settings(settings)
+            dlg.destroy()
+
+        bf = ttk.Frame(dlg)
+        bf.pack(fill=tk.X, padx=10, pady=10)
+        ttk.Button(bf, text=L("settings.apply"), command=_apply).pack(side=tk.RIGHT, padx=2)
+        ttk.Button(bf, text=L("settings.cancel"), command=dlg.destroy).pack(side=tk.RIGHT, padx=2)
 
     # ============================================================ download dialog
 
     def _download_dialog(self):
         """Open a dialog to download policy from a live firewall."""
         if not HAS_FETCH:
-            messagebox.showerror("Error", "fetch_policy.py not found in toolkit directory.")
+            messagebox.showerror(L("export.error"), L("open.no_fetch"))
             return
 
+        settings = load_settings()
+
         dlg = tk.Toplevel(self.root)
-        dlg.title("Download Policy from Firewall")
-        dlg.geometry("620x580")
+        dlg.title(L("dlg.title"))
+        dlg.geometry("620x620")
         dlg.transient(self.root)
         dlg.grab_set()
         dlg.resizable(True, True)
 
-        row = 0
-
         # -- connection frame
-        cf = ttk.LabelFrame(dlg, text="Connection", padding=10)
+        cf = ttk.LabelFrame(dlg, text=L("dlg.connection"), padding=10)
         cf.pack(fill=tk.X, padx=10, pady=5)
 
-        ttk.Label(cf, text="Server:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        server_var = tk.StringVar(value="192.168.1.1")
+        ttk.Label(cf, text=L("dlg.server")).grid(row=0, column=0, sticky=tk.W, pady=2)
+        server_var = tk.StringVar(value=settings.get("last_server", "192.168.1.1"))
         ttk.Entry(cf, textvariable=server_var, width=40).grid(row=0, column=1, padx=5, pady=2)
 
-        ttk.Label(cf, text="Username:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        user_var = tk.StringVar(value="admin")
+        ttk.Label(cf, text=L("dlg.username")).grid(row=1, column=0, sticky=tk.W, pady=2)
+        user_var = tk.StringVar(value=settings.get("last_username", "admin"))
         ttk.Entry(cf, textvariable=user_var, width=40).grid(row=1, column=1, padx=5, pady=2)
 
-        ttk.Label(cf, text="Password:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        ttk.Label(cf, text=L("dlg.password")).grid(row=2, column=0, sticky=tk.W, pady=2)
         pass_var = tk.StringVar()
         ttk.Entry(cf, textvariable=pass_var, width=40, show="*").grid(row=2, column=1, padx=5, pady=2)
 
-        ttk.Label(cf, text="Port:").grid(row=3, column=0, sticky=tk.W, pady=2)
-        port_var = tk.StringVar(value="443")
+        ttk.Label(cf, text=L("dlg.port")).grid(row=3, column=0, sticky=tk.W, pady=2)
+        port_var = tk.StringVar(value=str(settings.get("last_port", 443)))
         ttk.Entry(cf, textvariable=port_var, width=10).grid(row=3, column=1, sticky=tk.W, padx=5, pady=2)
 
-        ssl_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(cf, text="Verify SSL", variable=ssl_var).grid(row=3, column=1, padx=80, pady=2, sticky=tk.W)
+        ssl_var = tk.BooleanVar(value=settings.get("last_verify_ssl", False))
+        ttk.Checkbutton(cf, text=L("dlg.verify_ssl"), variable=ssl_var).grid(row=3, column=1, padx=80, pady=2, sticky=tk.W)
 
-        ttk.Label(cf, text="Vendor:").grid(row=4, column=0, sticky=tk.W, pady=2)
-        vendor_var = tk.StringVar(value="auto")
+        ttk.Label(cf, text=L("dlg.timeout")).grid(row=4, column=0, sticky=tk.W, pady=2)
+        timeout_var = tk.StringVar(value=str(self.timeout))
+        ttk.Entry(cf, textvariable=timeout_var, width=10).grid(row=4, column=1, sticky=tk.W, padx=5, pady=2)
+
+        ttk.Label(cf, text=L("dlg.page_size")).grid(row=5, column=0, sticky=tk.W, pady=2)
+        page_size_var = tk.StringVar(value=str(self.page_size))
+        ttk.Entry(cf, textvariable=page_size_var, width=10).grid(row=5, column=1, sticky=tk.W, padx=5, pady=2)
+
+        ttk.Label(cf, text=L("dlg.vendor")).grid(row=6, column=0, sticky=tk.W, pady=2)
+        vendor_var = tk.StringVar(value=settings.get("last_vendor", "auto"))
         vendor_combo = ttk.Combobox(cf, textvariable=vendor_var,
                                     values=["auto", "checkpoint", "paloalto", "fortinet"],
                                     state="readonly", width=20)
-        vendor_combo.grid(row=4, column=1, sticky=tk.W, padx=5, pady=2)
+        vendor_combo.grid(row=6, column=1, sticky=tk.W, padx=5, pady=2)
 
-        connect_btn = ttk.Button(cf, text="Connect & Fetch Layers")
-        connect_btn.grid(row=5, column=0, columnspan=2, pady=6)
+        ttk.Label(cf, text=L("dlg.output_dir")).grid(row=7, column=0, sticky=tk.W, pady=2)
+        out_dir_var = tk.StringVar(value=settings.get("last_output_dir", self.download_dir))
+        ttk.Entry(cf, textvariable=out_dir_var, width=30).grid(row=7, column=1, sticky=tk.W, padx=5, pady=2)
+
+        connect_btn = ttk.Button(cf, text=L("dlg.connect"))
+        connect_btn.grid(row=8, column=0, columnspan=2, pady=6)
 
         # -- layers frame
-        lf = ttk.LabelFrame(dlg, text="Access Layers (select to include)", padding=10)
+        lf = ttk.LabelFrame(dlg, text=L("dlg.layers_frame"), padding=10)
         lf.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
         layer_frame = ttk.Frame(lf)
@@ -895,27 +1111,38 @@ class SearchGUI:
             for cb in layer_checkboxes:
                 cb[1].set(False)
 
-        ttk.Button(bf, text="Select All", command=_select_all).pack(side=tk.LEFT, padx=2)
-        ttk.Button(bf, text="Clear All", command=_clear_all).pack(side=tk.LEFT, padx=2)
+        ttk.Button(bf, text=L("dlg.select_all"), command=_select_all).pack(side=tk.LEFT, padx=2)
+        ttk.Button(bf, text=L("dlg.clear_all"), command=_clear_all).pack(side=tk.LEFT, padx=2)
 
-        ttk.Label(bf, text="Policy name:").pack(side=tk.LEFT, padx=(20, 2))
-        pkg_var = tk.StringVar(value="fetched_policy")
+        ttk.Label(bf, text=L("dlg.policy_name")).pack(side=tk.LEFT, padx=(20, 2))
+        pkg_var = tk.StringVar(value=settings.get("last_policy_name", "fetched_policy"))
         ttk.Entry(bf, textvariable=pkg_var, width=20).pack(side=tk.LEFT, padx=2)
 
-        download_btn = ttk.Button(bf, text="Download & Load", state=tk.DISABLED)
+        download_btn = ttk.Button(bf, text=L("dlg.download_btn"), state=tk.DISABLED)
         download_btn.pack(side=tk.RIGHT, padx=2)
-        ttk.Button(bf, text="Cancel", command=dlg.destroy).pack(side=tk.RIGHT, padx=2)
+        ttk.Button(bf, text=L("dlg.cancel"), command=dlg.destroy).pack(side=tk.RIGHT, padx=2)
 
-        status_var = tk.StringVar(value="Enter credentials and click Connect")
+        status_var = tk.StringVar(value=L("dlg.status_connect"))
         status_bar = ttk.Label(dlg, textvariable=status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(fill=tk.X, padx=10, pady=(0, 5))
 
         layer_checkboxes = []
         _client_ref = [None]
 
+        def _save_last_connection():
+            save_settings({
+                "last_server": server_var.get().strip(),
+                "last_username": user_var.get().strip(),
+                "last_port": int(port_var.get().strip() or 443),
+                "last_vendor": vendor_var.get().strip().lower(),
+                "last_verify_ssl": ssl_var.get(),
+                "last_policy_name": pkg_var.get().strip() or "fetched_policy",
+                "last_output_dir": out_dir_var.get().strip() or "examples",
+            })
+
         def _do_connect():
             connect_btn.config(state=tk.DISABLED)
-            status_var.set("Connecting ...")
+            status_var.set(L("dlg.connecting"))
             dlg.update()
 
             server = server_var.get().strip()
@@ -924,12 +1151,26 @@ class SearchGUI:
             try:
                 port = int(port_var.get().strip())
             except ValueError:
-                status_var.set("Invalid port number.")
+                status_var.set(L("dlg.invalid_port"))
+                connect_btn.config(state=tk.NORMAL)
+                return
+
+            try:
+                timeout = int(timeout_var.get().strip())
+            except ValueError:
+                status_var.set(L("dlg.invalid_timeout"))
+                connect_btn.config(state=tk.NORMAL)
+                return
+
+            try:
+                page_size = int(page_size_var.get().strip())
+            except ValueError:
+                status_var.set(L("dlg.invalid_pagesize"))
                 connect_btn.config(state=tk.NORMAL)
                 return
 
             if not server or not username:
-                status_var.set("Server and username required.")
+                status_var.set(L("dlg.need_credentials"))
                 connect_btn.config(state=tk.NORMAL)
                 return
 
@@ -939,19 +1180,23 @@ class SearchGUI:
 
             is_checkpoint = (vendor is None or vendor == "checkpoint")
 
+            _save_last_connection()
+
             try:
                 if is_checkpoint:
                     client = CheckpointAPIClient(server, username, password,
-                                                  port=port, verify=ssl_var.get())
+                                                  port=port, verify=ssl_var.get(),
+                                                  timeout=timeout, page_size=page_size)
                     _client_ref[0] = client
-                    status_var.set("Connected. Fetching access layers ...")
+                    logging.info("Connected to %s as %s (Checkpoint)", server, username)
+                    status_var.set(L("dlg.fetching_layers"))
                     dlg.update()
                     layer_names = client.fetch_layers()
                     for cb in layer_checkboxes:
                         cb[0].destroy()
                     layer_checkboxes.clear()
                     if not layer_names:
-                        status_var.set("No access layers found on the server.")
+                        status_var.set(L("dlg.no_layers"))
                         connect_btn.config(state=tk.NORMAL)
                         return
                     for ln in layer_names:
@@ -960,46 +1205,55 @@ class SearchGUI:
                         cb.pack(anchor=tk.W, padx=5, pady=1)
                         layer_checkboxes.append((cb, var))
                     download_btn.config(state=tk.NORMAL)
-                    status_var.set(f"Connected. {len(layer_names)} layer(s) found. Select layers and click Download.")
+                    status_var.set(L("dlg.layers_found", count=len(layer_names)))
                 else:
                     # PA / FortiGate: fetch all directly
                     from fetch_policy import fetch_policy as _fp
-                    data = _fp(server, port, username, password, vendor=vendor, verify=ssl_var.get())
+                    logging.info("Fetching policy from %s (%s)", server, vendor or "auto")
+                    data = _fp(server, port, username, password, vendor=vendor, verify=ssl_var.get(), timeout=timeout, page_size=page_size)
                     ok = _save_and_load_download(data, dlg, status_var)
                     if not ok:
                         connect_btn.config(state=tk.NORMAL)
-                    return  # dialog destroyed on success
+                    return
 
             except (SystemExit, Exception) as e:
-                msg = str(e).strip() or "Connection failed"
-                status_var.set(f"Error: {msg}")
+                msg = str(e).strip() or L("dlg.error_connection")
+                logging.error("Connection error: %s", msg)
+                status_var.set(L("dlg.error_prefix", msg=msg))
                 connect_btn.config(state=tk.NORMAL)
                 return
 
             connect_btn.config(state=tk.NORMAL)
 
+        def _make_default_filename(server, pkg_name):
+            safe_server = server.replace(":", "_").replace("/", "_").replace(" ", "_")
+            safe_pkg = pkg_name.replace(" ", "_").replace("/", "_")
+            date_str = time.strftime("%Y%m%d-%H%M%S")
+            return f"{safe_server}_{safe_pkg}_{date_str}.json"
+
         def _save_and_load_download(data, original_dlg, status_var):
-            status_var.set("Sanitizing data ...")
+            status_var.set(L("dlg.sanitizing"))
             original_dlg.update()
             data = _sanitize(data)
-            status_var.set("Saving ...")
-            original_dlg.update()
-            out_dir = "outputs"
+            default_name = _make_default_filename(server_var.get().strip(), pkg_var.get().strip() or "fetched_policy")
+            out_dir = out_dir_var.get().strip() or self.download_dir
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir, exist_ok=True)
-            default_name = "firewall_policy.json"
+            status_var.set(L("dlg.saving"))
+            original_dlg.update()
             save_path = filedialog.asksaveasfilename(
-                title="Save policy as",
+                title=L("dlg.save_title"),
                 initialdir=os.path.abspath(out_dir),
                 initialfile=default_name,
                 defaultextension=".json",
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+                filetypes=[(L("export.filter_json"), "*.json"), (L("export.filter_all"), "*.*")])
             if not save_path:
-                status_var.set("Save cancelled.")
+                status_var.set(L("dlg.save_cancelled"))
                 return False
             with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, default=str)
-            status_var.set("Loading into GUI ...")
+            logging.info("Policy saved to %s", save_path)
+            status_var.set(L("dlg.loading"))
             original_dlg.update()
             original_dlg.destroy()
             self._load(save_path)
@@ -1008,26 +1262,31 @@ class SearchGUI:
         def _do_download():
             selected = [ln for (_, var), ln in zip(layer_checkboxes,
                          [cb[0].cget("text") for cb in layer_checkboxes]) if var.get()]
+            pkg_name = pkg_var.get().strip() or "fetched_policy"
+
+            # If no layers checked, use the policy name field as the layer name
             if not selected:
-                status_var.set("Select at least one layer to download.")
-                return
+                if pkg_name and _client_ref[0]:
+                    selected = [pkg_name]
+                else:
+                    status_var.set(L("dlg.need_layer"))
+                    return
 
             download_btn.config(state=tk.DISABLED)
             connect_btn.config(state=tk.DISABLED)
             client = _client_ref[0]
             if not client:
-                status_var.set("Not connected.")
+                status_var.set(L("dlg.not_connected"))
                 return
 
-            pkg_name = pkg_var.get().strip() or "fetched_policy"
-
             try:
-                status_var.set("Fetching rulebases ...")
+                status_var.set(L("dlg.fetch_rules"))
                 dlg.update()
                 layers_data = []
                 for i, ln in enumerate(selected):
-                    status_var.set(f"Fetching layer {i+1}/{len(selected)}: {ln}")
+                    status_var.set(L("dlg.fetch_layer_n", n=i+1, total=len(selected), name=ln))
                     dlg.update()
+                    logging.info("Fetching rulebase: %s", ln)
                     rb = client.fetch_rulebase(ln)
                     layer = {"name": ln, "uid": rb.get("uid", ""),
                              "rules": [], "inline-layers": []}
@@ -1048,23 +1307,29 @@ class SearchGUI:
                             layer["rules"].append(item)
                     layers_data.append(layer)
 
-                status_var.set("Fetching HTTPS inspection ...")
+                status_var.set(L("dlg.fetch_https"))
                 dlg.update()
                 try:
                     https_rules = client.fetch_https_inspection()
-                except Exception:
+                    logging.info("HTTPS rules: %d", len(https_rules))
+                except Exception as e:
+                    logging.warning("HTTPS fetch failed: %s", e)
                     https_rules = []
 
-                status_var.set("Fetching threat prevention ...")
+                status_var.set(L("dlg.fetch_threat"))
                 dlg.update()
                 try:
                     threat_rules = client.fetch_threat_rulebase()
-                except Exception:
+                    logging.info("Threat rules: %d", len(threat_rules))
+                except Exception as e:
+                    logging.warning("Threat fetch failed: %s", e)
                     threat_rules = []
 
-                status_var.set("Fetching objects ...")
+                status_var.set(L("dlg.fetch_objects"))
                 dlg.update()
                 objects = client.fetch_all_objects()
+                total_objs = sum(len(v) for v in objects.values())
+                logging.info("Objects fetched: %d total across %d types", total_objs, len(objects))
 
                 data = {
                     "policy-package": {
@@ -1084,16 +1349,17 @@ class SearchGUI:
                     download_btn.config(state=tk.NORMAL)
                     connect_btn.config(state=tk.NORMAL)
                     return
-                # dialog destroyed by _save_and_load_download on success
                 try:
                     client.logout()
+                    logging.info("Logged out from %s", server_var.get().strip())
                 except Exception:
                     pass
                 return
 
             except (SystemExit, Exception) as e:
-                msg = str(e).strip() or "Download failed"
-                status_var.set(f"Error: {msg}")
+                msg = str(e).strip() or L("dlg.error_download")
+                logging.error("Download error: %s", msg)
+                status_var.set(L("dlg.error_prefix", msg=msg))
                 download_btn.config(state=tk.NORMAL)
                 connect_btn.config(state=tk.NORMAL)
                 return
@@ -1104,8 +1370,8 @@ class SearchGUI:
 
     def open_file(self):
         path = filedialog.askopenfilename(
-            title="Open Checkpoint policy JSON",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+            title=L("open.title"),
+            filetypes=[(L("export.filter_json"), "*.json"), (L("export.filter_all"), "*.*")])
         if path:
             self._load(path)
 
@@ -1113,7 +1379,7 @@ class SearchGUI:
         try:
             self.data = load_policy(path)
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to load:\n{e}")
+            messagebox.showerror(L("export.error"), L("open.load_error", e=e))
             return
 
         self.all_objects = collect_objects(self.data)
@@ -1122,7 +1388,7 @@ class SearchGUI:
         self.all_rules = list(extract_rules(self.data))
         self.all_nat_rules = list(extract_nat_rules(self.data))
         self.file_label.config(text=os.path.basename(path))
-        self.root.title(f"Checkpoint Policy Search — {os.path.basename(path)}")
+        self.root.title(L("app.title_file", name=os.path.basename(path)))
         self._do_obj_search()
         self._do_rule_search()
         self._do_nat_search()

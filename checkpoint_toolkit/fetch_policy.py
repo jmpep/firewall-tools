@@ -24,15 +24,15 @@ def _create_ctx(verify):
     return ctx
 
 
-def _http_get(url, headers=None, verify=False):
+def _http_get(url, headers=None, verify=False, timeout=300):
     req = urllib.request.Request(url, headers=headers or {})
-    with urllib.request.urlopen(req, context=_create_ctx(verify), timeout=60) as resp:
+    with urllib.request.urlopen(req, context=_create_ctx(verify), timeout=timeout) as resp:
         return resp.read()
 
 
-def _http_post(url, data, headers=None, verify=False):
+def _http_post(url, data, headers=None, verify=False, timeout=300):
     req = urllib.request.Request(url, data=data, headers=headers or {}, method="POST")
-    with urllib.request.urlopen(req, context=_create_ctx(verify), timeout=120) as resp:
+    with urllib.request.urlopen(req, context=_create_ctx(verify), timeout=timeout) as resp:
         return resp.read()
 
 
@@ -123,9 +123,11 @@ def _common_rule(rule_num, name, uid, enabled, source, dest, service,
 class CheckpointAPIClient:
     """Client for Checkpoint R81.x Management Web API (no external deps)."""
 
-    def __init__(self, server, username, password, port=443, verify=False):
-        self.base_url = f"https://{server}:{port}/web_api"
+    def __init__(self, server, username, password, port=443, verify=False, timeout=300, page_size=200):
+        self.base_url = f"https://{server}:{port}"
         self.verify = verify
+        self.timeout = timeout
+        self.page_size = page_size
         self.sid = None
         self._login(username, password)
 
@@ -140,15 +142,13 @@ class CheckpointAPIClient:
             headers["X-chkp-sid"] = self.sid
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, context=_create_ctx(self.verify), timeout=120) as resp:
+            with urllib.request.urlopen(req, context=_create_ctx(self.verify), timeout=self.timeout) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")
-            print(f"  API error {endpoint}: {e.code} {body[:300]}")
-            sys.exit(1)
+            raise RuntimeError(f"Checkpoint API error {endpoint}: {e.code} {body[:300]}")
         except urllib.error.URLError as e:
-            print(f"  Connection error {endpoint}: {e.reason}")
-            sys.exit(1)
+            raise RuntimeError(f"Checkpoint connection error {endpoint}: {e.reason}")
 
     # ------------------------------------------------------------------ auth
 
@@ -164,10 +164,10 @@ class CheckpointAPIClient:
 
     # ------------------------------------------------------------------ pagination
 
-    def _paginate(self, endpoint, payload, limit=500, result_key=None):
+    def _paginate(self, endpoint, payload, limit=None, result_key=None):
         all_data = []
         payload = dict(payload)
-        payload["limit"] = limit
+        payload["limit"] = limit if limit is not None else self.page_size
         payload["offset"] = 0
         while True:
             res = self._post(endpoint, payload)
@@ -304,9 +304,11 @@ class CheckpointAPIClient:
 class PaloAltoAPIClient:
     """Client for Palo Alto Networks PAN-OS XML API."""
 
-    def __init__(self, server, username, password, port=443, verify=False):
+    def __init__(self, server, username, password, port=443, verify=False, timeout=300, page_size=200):
         self.base_url = f"https://{server}:{port}"
         self.verify = verify
+        self.timeout = timeout
+        self.page_size = page_size
         self.api_key = None
         self._login(username, password)
 
@@ -314,13 +316,13 @@ class PaloAltoAPIClient:
         url = f"{self.base_url}/api/?{urllib.parse.urlencode(params)}"
         if self.api_key:
             url += f"&key={self.api_key}"
-        resp = _http_get(url, verify=self.verify)
+        resp = _http_get(url, verify=self.verify, timeout=self.timeout)
         return ET.fromstring(resp)
 
     def _api_post(self, params):
         url = f"{self.base_url}/api/"
         data = urllib.parse.urlencode(params).encode()
-        resp = _http_post(url, data, verify=self.verify)
+        resp = _http_post(url, data, verify=self.verify, timeout=self.timeout)
         return ET.fromstring(resp)
 
     def _login(self, username, password):
@@ -331,8 +333,7 @@ class PaloAltoAPIClient:
         if key_el is None or not key_el.text:
             error = root.find(".//msg")
             msg = error.text if error is not None else "Unknown error"
-            print(f"  Palo Alto login failed: {msg}")
-            sys.exit(1)
+            raise RuntimeError(f"Palo Alto login failed: {msg}")
         self.api_key = key_el.text
         print(f"  Login OK  key={self.api_key[:8]}...")
 
@@ -556,9 +557,11 @@ class PaloAltoAPIClient:
 class FortinetAPIClient:
     """Client for Fortinet FortiGate REST API."""
 
-    def __init__(self, server, username, password, port=443, verify=False):
+    def __init__(self, server, username, password, port=443, verify=False, timeout=300, page_size=200):
         self.base_url = f"https://{server}:{port}"
         self.verify = verify
+        self.timeout = timeout
+        self.page_size = page_size
         self.session = None
         self._login(username, password)
 
@@ -567,7 +570,7 @@ class FortinetAPIClient:
         headers = {"Accept": "application/json"}
         if self.session:
             headers["Cookie"] = f"ccsrftoken={self.session}; APSCOOKIE={self.session}"
-        resp = _http_get(url, headers, self.verify)
+        resp = _http_get(url, headers, self.verify, timeout=self.timeout)
         return json.loads(resp.decode("utf-8"))
 
     def _post(self, path, data_dict):
@@ -576,7 +579,7 @@ class FortinetAPIClient:
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self.session:
             headers["Cookie"] = f"ccsrftoken={self.session}; APSCOOKIE={self.session}"
-        resp = _http_post(url, data, headers, self.verify)
+        resp = _http_post(url, data, headers, self.verify, timeout=self.timeout)
         return json.loads(resp.decode("utf-8"))
 
     def _login(self, username, password):
@@ -596,7 +599,7 @@ class FortinetAPIClient:
             data = urllib.parse.urlencode({"username": username, "secretkey": password}).encode()
             url = f"{self.base_url}/logincheck"
             req = urllib.request.Request(url, data=data, method="POST")
-            with urllib.request.urlopen(req, context=_create_ctx(self.verify), timeout=60) as resp:
+            with urllib.request.urlopen(req, context=_create_ctx(self.verify), timeout=self.timeout) as resp:
                 for c in resp.headers.get_all("Set-Cookie") or []:
                     if "ccsrftoken" in c:
                         self.session = c.split("=")[1].split(";")[0].strip()
@@ -604,11 +607,9 @@ class FortinetAPIClient:
             if self.session:
                 print(f"  Login OK  session={self.session[:8]}...")
             else:
-                print("  Fortinet login failed: no session cookie")
-                sys.exit(1)
+                raise RuntimeError("Fortinet login failed: no session cookie")
         except Exception as e:
-            print(f"  Fortinet login failed: {e}")
-            sys.exit(1)
+            raise RuntimeError(f"Fortinet login failed: {e}")
 
     def logout(self):
         try:
@@ -820,11 +821,11 @@ VENDOR_CLIENTS = {
 }
 
 
-def fetch_policy(server, port, username, password, vendor=None, verify=False):
+def fetch_policy(server, port, username, password, vendor=None, verify=False,
+                 timeout=300, page_size=200):
     """Detect vendor (if not given) and fetch policy data."""
     if vendor and vendor not in VENDORS:
-        print(f"Unknown vendor '{vendor}'. Choose from: {', '.join(VENDORS)}")
-        sys.exit(1)
+        raise ValueError(f"Unknown vendor '{vendor}'. Choose from: {', '.join(VENDORS)}")
 
     if vendor is None:
         print("Detecting firewall vendor ...")
@@ -840,7 +841,8 @@ def fetch_policy(server, port, username, password, vendor=None, verify=False):
 
     cls = VENDOR_CLIENTS[vendor]
     print(f"Connecting to {server}:{port} as {username} ({vendor}) ...")
-    client = cls(server, username, password, port=port, verify=verify)
+    client = cls(server, username, password, port=port, verify=verify,
+                 timeout=timeout, page_size=page_size)
     data = client.fetch_all()
     client.logout()
     return data

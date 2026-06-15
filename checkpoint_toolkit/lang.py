@@ -1,0 +1,422 @@
+"""Multi-language support for the firewall toolkit GUI."""
+
+import logging
+
+# Flag icons (unicode regional indicators) — used as fallback when images missing
+FLAGS = {
+    "en": "\U0001F1EC\U0001F1E7",
+    "fr": "\U0001F1EB\U0001F1F7",
+    "de": "\U0001F1E9\U0001F1EA",
+    "it": "\U0001F1EE\U0001F1F9",
+    "sk": "\U0001F1F8\U0001F1F0",
+}
+
+LANG_CODES = {"en", "fr", "de", "it", "sk"}
+
+# ── Translation table ──────────────────────────────────────────────────────
+# Each entry: key -> {lang: translation}
+# Keys are dotted paths matching the GUI context.
+
+T = {
+
+    # ── global / top-level ──
+    "app.title": {
+        "en": "Firewall Policy Search",
+        "fr": "Recherche de Politique Pare-feu",
+        "de": "Firewall-Richtliniensuche",
+        "it": "Ricerca Politiche Firewall",
+        "sk": "Vyh\u013ead\u00e1vanie Pravidiel Firewallu",
+    },
+    "app.title_file": {
+        "en": "Firewall Policy Search \u2014 {}",
+        "fr": "Recherche de Politique \u2014 {}",
+        "de": "Firewall-Richtliniensuche \u2014 {}",
+        "it": "Ricerca Politiche \u2014 {}",
+        "sk": "Vyh\u013ead\u00e1vanie Pravidiel \u2014 {}",
+    },
+
+    # ── menu ──
+    "menu.file": {"en": "File", "fr": "Fichier", "de": "Datei", "it": "File", "sk": "S\u00fabor"},
+    "menu.open": {"en": "Open JSON \u2026", "fr": "Ouvrir JSON \u2026", "de": "JSON \u00f6ffnen \u2026",
+                  "it": "Apri JSON \u2026", "sk": "Otvori\u0165 JSON \u2026"},
+    "menu.exit": {"en": "Exit", "fr": "Quitter", "de": "Beenden", "it": "Esci", "sk": "Koniec"},
+
+    # ── toolbar ──
+    "tb.file_label": {"en": "File:", "fr": "Fichier :", "de": "Datei:", "it": "File:", "sk": "S\u00fabor:"},
+    "tb.open": {"en": "Open", "fr": "Ouvrir", "de": "\u00d6ffnen", "it": "Apri", "sk": "Otvori\u0165"},
+    "tb.download": {"en": "Download Policy from Firewall", "fr": "T\u00e9l\u00e9charger la politique",
+                    "de": "Richtlinie herunterladen", "it": "Scarica policy dal firewall",
+                    "sk": "Stiahnu\u0165 pravidl\u00e1 z firewallu"},
+    "tb.settings": {"en": "\u2699 Settings", "fr": "\u2699 Param\u00e8tres", "de": "\u2699 Einstellungen",
+                    "it": "\u2699 Impostazioni", "sk": "\u2699 Nastavenia"},
+    "tb.lang": {"en": "Lang:", "fr": "Langue :", "de": "Sprache:", "it": "Lingua:", "sk": "Jazyk:"},
+
+    # ── banner ──
+    "banner.title": {"en": "Firewall Policy Toolkit  \u2014  Checkpoint / Fortinet / Palo Alto",
+                     "fr": "Kit de Politique Pare-feu  \u2014  Checkpoint / Fortinet / Palo Alto",
+                     "de": "Firewall-Richtlinien-Toolkit  \u2014  Checkpoint / Fortinet / Palo Alto",
+                     "it": "Toolkit Politiche Firewall  \u2014  Checkpoint / Fortinet / Palo Alto",
+                     "sk": "N\u00e1stroje pre Pravidl\u00e1 Firewallu  \u2014  Checkpoint / Fortinet / Palo Alto"},
+    "banner.subtitle": {
+        "en": "v13  \u2022  5000+ objects  \u2022  1000+ rules  \u2022  enjoy and give me feedback.  Jean-Michel. Code under https://github.com/jmpep/firewall-tools",
+        "fr": "v13  \u2022  5000+ objets  \u2022  1000+ r\u00e8gles  \u2022  profitez et donnez votre avis.  Jean-Michel. Code under https://github.com/jmpep/firewall-tools",
+        "de": "v13  \u2022  5000+ Objekte  \u2022  1000+ Regeln  \u2022  viel Spa\u00df und Feedback.  Jean-Michel. Code under https://github.com/jmpep/firewall-tools",
+        "it": "v13  \u2022  5000+ oggetti  \u2022  1000+ regole  \u2022  divertiti e dammi feedback.  Jean-Michel. Code under https://github.com/jmpep/firewall-tools",
+        "sk": "v13  \u2022  5000+ objektov  \u2022  1000+ pravidiel  \u2022  u\u017e\u00edvajte a dajte sp\u00e4tn\u00fa v\u00e4zbu. V\u00e1\u0161 priate\u013e Jean-Michel",
+    },
+
+    # ── tab labels ──
+    "tab.objects": {"en": "Objects", "fr": "Objets", "de": "Objekte", "it": "Oggetti", "sk": "Objekty"},
+    "tab.rules": {"en": "Rules", "fr": "R\u00e8gles", "de": "Regeln", "it": "Regole", "sk": "Pravidl\u00e1"},
+    "tab.nat": {"en": "NAT Rules", "fr": "R\u00e8gles NAT", "de": "NAT-Regeln", "it": "Regole NAT",
+                "sk": "NAT pravidl\u00e1"},
+
+    # ── search ──
+    "search.placeholder": {"en": "Search:", "fr": "Recherche :", "de": "Suche:", "it": "Cerca:", "sk": "H\u013eadanie:"},
+    "search.hint_objects": {
+        "en": "  Space = AND,  * = any,  . = single char",
+        "fr": "  Espace = ET,  * = qqch,  . = 1 car.",
+        "de": "  Leerzeichen = UND,  * = beliebig,  . = 1 Zeichen",
+        "it": "  Spazio = AND,  * = qualsiasi,  . = 1 carattere",
+        "sk": "  Medzera = A,  * = \u013eubovo\u013en\u00e9,  . = 1 znak",
+    },
+    "search.hint_rules": {
+        "en": "  field:value AND / OR   (* = any, . = single char)",
+        "fr": "  champ:valeur ET / OU   (* = qqch, . = 1 car.)",
+        "de": "  feld:wert UND / ODER   (* = beliebig, . = 1 Zeichen)",
+        "it": "  campo:valore AND / OR   (* = qualsiasi, . = 1 carattere)",
+        "sk": "  pole:hodnota A / ALEBO   (* = \u013eubovo\u013en\u00e9, . = 1 znak)",
+    },
+    "search.search": {"en": "Search", "fr": "Chercher", "de": "Suchen", "it": "Cerca", "sk": "H\u013eada\u0165"},
+    "search.count_objects": {"en": "{n} objects", "fr": "{n} objets", "de": "{n} Objekte",
+                             "it": "{n} oggetti", "sk": "{n} objektov"},
+    "search.count_matched": {"en": "{n} / {total}", "fr": "{n} / {total}",
+                             "de": "{n} / {total}", "it": "{n} / {total}",
+                             "sk": "{n} / {total}"},
+    "search.count_rules": {"en": "{n} / {total}", "fr": "{n} / {total}",
+                            "de": "{n} / {total}", "it": "{n} / {total}",
+                            "sk": "{n} / {total}"},
+    "search.count_total_rules": {"en": "{n}", "fr": "{n}", "de": "{n}",
+                                 "it": "{n}", "sk": "{n}"},
+    "search.count_nat": {"en": "{n} NAT rules", "fr": "{n} r\u00e8gles NAT",
+                         "de": "{n} NAT-Regeln", "it": "{n} regole NAT",
+                         "sk": "{n} NAT pravidiel"},
+
+    # ── split options ──
+    "split.split": {"en": "Split", "fr": "Diviser", "de": "Aufteilen", "it": "Dividi", "sk": "Rozdeli\u0165"},
+    "split.groups": {"en": "Split Groups", "fr": "Diviser Groupes", "de": "Gruppen aufteilen",
+                     "it": "Dividi Gruppi", "sk": "Rozdeli\u0165 skupiny"},
+
+    # ── export ──
+    "export.all_csv": {"en": "Export All to CSV", "fr": "Exporter tout en CSV", "de": "Alle als CSV exportieren",
+                       "it": "Esporta tutto in CSV", "sk": "Exportova\u0165 v\u0161etko do CSV"},
+    "export.searched_csv": {"en": "Export Searched to CSV", "fr": "Exporter la recherche en CSV",
+                            "de": "Gefundene als CSV exportieren", "it": "Esporta risultati in CSV",
+                            "sk": "Exportova\u0165 n\u00e1jden\u00e9 do CSV"},
+    "export.exported": {
+        "en": "Exported {count} rows to {path}",
+        "fr": "{count} lignes export\u00e9es vers {path}",
+        "de": "{count} Zeilen exportiert nach {path}",
+        "it": "{count} righe esportate in {path}",
+        "sk": "Exportovan\u00fdch {count} riadkov do {path}",
+    },
+    "export.no_data": {"en": "No data to export.", "fr": "Aucune donn\u00e9e \u00e0 exporter.",
+                       "de": "Keine Daten zu exportieren.", "it": "Nessun dato da esportare.",
+                       "sk": "\u017diadne \u00fadaje na export."},
+    "export.error": {"en": "Export error", "fr": "Erreur d'export", "de": "Exportfehler",
+                     "it": "Errore di esportazione", "sk": "Chyba exportu"},
+    "export.title": {"en": "Export to CSV", "fr": "Exporter en CSV", "de": "Als CSV exportieren",
+                     "it": "Esporta in CSV", "sk": "Exportova\u0165 do CSV"},
+    "export.filter_json": {"en": "JSON policy files (*.json)", "fr": "Fichiers JSON (*.json)",
+                           "de": "JSON-Richtliniendateien (*.json)", "it": "File policy JSON (*.json)",
+                           "sk": "JSON s\u00fabory pravidiel (*.json)"},
+    "export.filter_csv": {"en": "CSV files (*.csv)", "fr": "Fichiers CSV (*.csv)",
+                          "de": "CSV-Dateien (*.csv)", "it": "File CSV (*.csv)",
+                          "sk": "CSV s\u00fabory (*.csv)"},
+    "export.filter_all": {"en": "All files (*.*)", "fr": "Tous les fichiers (*.*)",
+                          "de": "Alle Dateien (*.*)", "it": "Tutti i file (*.*)",
+                          "sk": "V\u0161etky s\u00fabory (*.*)"},
+    "export.save_title": {"en": "Save to CSV", "fr": "Enregistrer en CSV", "de": "Als CSV speichern",
+                          "it": "Salva in CSV", "sk": "Ulo\u017ei\u0165 do CSV"},
+
+    # ── rule detail ──
+    "detail.rule": {"en": "Rule detail", "fr": "D\u00e9tail de la r\u00e8gle", "de": "Regeldetails",
+                    "it": "Dettaglio regola", "sk": "Podrobnosti pravidla"},
+    "detail.nat": {"en": "NAT rule detail", "fr": "D\u00e9tail r\u00e8gle NAT", "de": "NAT-Regeldetail",
+                   "it": "Dettaglio regola NAT", "sk": "Podrobnosti NAT pravidla"},
+    "detail.object": {"en": "Object detail", "fr": "D\u00e9tail de l'objet", "de": "Objektdetails",
+                      "it": "Dettaglio oggetto", "sk": "Podrobnosti objektu"},
+
+    # ── settings dialog ──
+    "settings.title": {"en": "Settings", "fr": "Param\u00e8tres", "de": "Einstellungen",
+                       "it": "Impostazioni", "sk": "Nastavenia"},
+    "settings.api": {"en": "API Request Settings", "fr": "Param\u00e8tres de requ\u00eate API",
+                     "de": "API-Anfrage-Einstellungen", "it": "Impostazioni richieste API",
+                     "sk": "Nastavenia API po\u017eiadaviek"},
+    "settings.page_size": {"en": "Page size (objects/rules per request):",
+                           "fr": "Taille page (objets/r\u00e8gles par requ\u00eate) :",
+                           "de": "Seitengr\u00f6\u00dfe (Objekte/Regeln pro Anfrage):",
+                           "it": "Dimensione pagina (oggetti/regole per richiesta):",
+                           "sk": "Ve\u013ekos\u0165 str\u00e1nky (objekty/pravidl\u00e1 na po\u017eiadavku):"},
+    "settings.timeout": {"en": "Timeout (seconds per request):",
+                         "fr": "D\u00e9lai d'attente (secondes par requ\u00eate) :",
+                         "de": "Zeitlimit (Sekunden pro Anfrage):",
+                         "it": "Timeout (secondi per richiesta):",
+                         "sk": "\u010casov\u00fd limit (sekundy na po\u017eiadavku):"},
+    "settings.logging": {"en": "Logging", "fr": "Journalisation", "de": "Protokollierung",
+                         "it": "Registrazione", "sk": "Protokolovanie"},
+    "settings.log_level": {"en": "Log level:", "fr": "Niveau de journal :", "de": "Protokollstufe:",
+                           "it": "Livello di log:", "sk": "\u00darove\u0148 protokolu:"},
+    "settings.download_dir": {"en": "Download dir:", "fr": "Dossier de t\u00e9l\u00e9chargement :",
+                              "de": "Download-Verzeichnis:", "it": "Cartella di download:",
+                              "sk": "Adres\u00e1r na s\u0165ahovanie:"},
+    "settings.reset_log": {"en": "Reset Log File", "fr": "R\u00e9initialiser le journal",
+                           "de": "Log zur\u00fccksetzen", "it": "Azzera file di log",
+                           "sk": "Vymaza\u0165 protokol"},
+    "settings.log_reset_ok": {"en": "Log file cleared.", "fr": "Journal effac\u00e9.",
+                              "de": "Protokolldatei gel\u00f6scht.", "it": "File di log azzerato.",
+                              "sk": "Protokol vymazan\u00fd."},
+    "settings.log_reset_title": {"en": "Log Reset", "fr": "R\u00e9initialisation",
+                                 "de": "Log zur\u00fccksetzen", "it": "Reset Log",
+                                 "sk": "Vymazanie protokolu"},
+    "settings.apply": {"en": "Apply", "fr": "Appliquer", "de": "\u00dcbernehmen",
+                       "it": "Applica", "sk": "Pou\u017ei\u0165"},
+    "settings.cancel": {"en": "Cancel", "fr": "Annuler", "de": "Abbrechen",
+                        "it": "Annulla", "sk": "Zru\u0161i\u0165"},
+
+    # ── download dialog ──
+    "dlg.title": {"en": "Download Policy from Firewall", "fr": "T\u00e9l\u00e9charger la politique",
+                  "de": "Richtlinie herunterladen", "it": "Scarica policy dal firewall",
+                  "sk": "Stiahnu\u0165 pravidl\u00e1 z firewallu"},
+    "dlg.connection": {"en": "Connection", "fr": "Connexion", "de": "Verbindung",
+                       "it": "Connessione", "sk": "Pripojenie"},
+    "dlg.server": {"en": "Server:", "fr": "Serveur :", "de": "Server:", "it": "Server:", "sk": "Server:"},
+    "dlg.username": {"en": "Username:", "fr": "Utilisateur :", "de": "Benutzername:",
+                     "it": "Utente:", "sk": "Pou\u017e\u00edvate\u013e:"},
+    "dlg.password": {"en": "Password:", "fr": "Mot de passe :", "de": "Passwort:",
+                     "it": "Password:", "sk": "Heslo:"},
+    "dlg.port": {"en": "Port:", "fr": "Port :", "de": "Port:", "it": "Porta:", "sk": "Port:"},
+    "dlg.verify_ssl": {"en": "Verify SSL", "fr": "V\u00e9rifier SSL", "de": "SSL pr\u00fcfen",
+                       "it": "Verifica SSL", "sk": "Overi\u0165 SSL"},
+    "dlg.timeout": {"en": "Timeout (s):", "fr": "D\u00e9lai (s) :", "de": "Zeitlimit (s):",
+                    "it": "Timeout (s):", "sk": "\u010casov\u00fd limit (s):"},
+    "dlg.page_size": {"en": "Page size:", "fr": "Taille page :", "de": "Seitengr\u00f6\u00dfe:",
+                      "it": "Dimensione pagina:", "sk": "Ve\u013ekos\u0165 str\u00e1nky:"},
+    "dlg.vendor": {"en": "Vendor:", "fr": "Fournisseur :", "de": "Hersteller:",
+                   "it": "Fornitore:", "sk": "V\u00fdrobca:"},
+    "dlg.output_dir": {"en": "Output dir:", "fr": "Dossier sortie :", "de": "Ausgabeverz.:",
+                       "it": "Cartella output:", "sk": "V\u00fdstupn\u00fd adres\u00e1r:"},
+    "dlg.connect": {"en": "Connect && Fetch Layers", "fr": "Connecter && Lister les couches",
+                    "de": "Verbinden && Ebenen abrufen", "it": "Connetti && Carica layer",
+                    "sk": "Pripoji\u0165 && Na\u010d\u00edta\u0165 vrstvy"},
+    "dlg.layers_frame": {"en": "Access Layers (select to include)",
+                         "fr": "Couches d'acc\u00e8s (s\u00e9lectionner)",
+                         "de": "Zugriffsebenen (ausw\u00e4hlen)",
+                         "it": "Layer di accesso (seleziona)",
+                         "sk": "Pr\u00edstupov\u00e9 vrstvy (vyberte)"},
+    "dlg.select_all": {"en": "Select All", "fr": "Tout s\u00e9lectionner", "de": "Alle ausw\u00e4hlen",
+                       "it": "Seleziona tutto", "sk": "Vybra\u0165 v\u0161etko"},
+    "dlg.clear_all": {"en": "Clear All", "fr": "Tout d\u00e9s\u00e9lectionner", "de": "Alle abw\u00e4hlen",
+                      "it": "Deseleziona tutto", "sk": "Zru\u0161i\u0165 v\u0161etko"},
+    "dlg.policy_name": {"en": "Policy name:", "fr": "Nom de la politique :", "de": "Richtlinienname:",
+                        "it": "Nome policy:", "sk": "N\u00e1zov pravidiel:"},
+    "dlg.download_btn": {"en": "Download && Load", "fr": "T\u00e9l\u00e9charger && Charger",
+                         "de": "Herunterladen && Laden", "it": "Scarica && Carica",
+                         "sk": "Stiahnu\u0165 && Na\u010d\u00edta\u0165"},
+    "dlg.cancel": {"en": "Cancel", "fr": "Annuler", "de": "Abbrechen",
+                   "it": "Annulla", "sk": "Zru\u0161i\u0165"},
+    "dlg.status_connect": {"en": "Enter credentials and click Connect",
+                           "fr": "Entrez les identifiants et cliquez sur Connecter",
+                           "de": "Anmeldedaten eingeben und Verbinden klicken",
+                           "it": "Inserisci credenziali e clicca Connetti",
+                           "sk": "Zadajte prihlasovacie \u00fadaje a kliknite na Pripoji\u0165"},
+    "dlg.connecting": {"en": "Connecting \u2026", "fr": "Connexion \u2026", "de": "Verbinde \u2026",
+                       "it": "Connessione \u2026", "sk": "Prip\u00e1jam \u2026"},
+    "dlg.fetching_layers": {"en": "Connected. Fetching access layers \u2026",
+                            "fr": "Connect\u00e9. R\u00e9cup\u00e9ration des couches \u2026",
+                            "de": "Verbunden. Rufe Ebenen ab \u2026",
+                            "it": "Connesso. Caricamento layer \u2026",
+                            "sk": "Pripojen\u00e9. Na\u010d\u00edtavam pr\u00edstupov\u00e9 vrstvy \u2026"},
+    "dlg.no_layers": {"en": "No access layers found on the server.",
+                      "fr": "Aucune couche d'acc\u00e8s trouv\u00e9e sur le serveur.",
+                      "de": "Keine Zugriffsebenen auf dem Server gefunden.",
+                      "it": "Nessun layer di accesso trovato sul server.",
+                      "sk": "Na serveri sa nena\u0161li \u017eiadne pr\u00edstupov\u00e9 vrstvy."},
+    "dlg.layers_found": {
+        "en": "Connected. {count} layer(s) found. Select layers and click Download.",
+        "fr": "Connect\u00e9. {count} couche(s) trouv\u00e9e(s). S\u00e9lectionnez et t\u00e9l\u00e9chargez.",
+        "de": "Verbunden. {count} Ebene(n) gefunden. W\u00e4hlen Sie aus und laden Sie herunter.",
+        "it": "Connesso. {count} layer trovati. Seleziona e scarica.",
+        "sk": "Pripojen\u00e9. N\u00e1jden\u00fdch {count} vrstiev. Vyberte a stiahnite.",
+    },
+    "dlg.need_layer": {"en": "Select at least one layer or specify a policy name.",
+                       "fr": "S\u00e9lectionnez au moins une couche ou un nom de politique.",
+                       "de": "W\u00e4hlen Sie mindestens eine Ebene oder einen Richtliniennamen.",
+                       "it": "Seleziona almeno un layer o specifica un nome policy.",
+                       "sk": "Vyberte aspo\u0148 jednu vrstvu alebo zadajte n\u00e1zov pravidiel."},
+    "dlg.fetch_rules": {"en": "Fetching rulebases \u2026", "fr": "R\u00e9cup\u00e9ration des r\u00e8gles \u2026",
+                        "de": "Rufe Regelwerke ab \u2026", "it": "Caricamento regole \u2026",
+                        "sk": "Na\u010d\u00edtavam pravidl\u00e1 \u2026"},
+    "dlg.fetch_layer_n": {
+        "en": "Fetching layer {n}/{total}: {name}",
+        "fr": "R\u00e9cup\u00e9ration couche {n}/{total} : {name}",
+        "de": "Rufe Ebene {n}/{total} ab: {name}",
+        "it": "Caricamento layer {n}/{total}: {name}",
+        "sk": "Na\u010d\u00edtavam vrstvu {n}/{total}: {name}",
+    },
+    "dlg.fetch_https": {"en": "Fetching HTTPS inspection \u2026",
+                        "fr": "R\u00e9cup\u00e9ration inspection HTTPS \u2026",
+                        "de": "Rufe HTTPS-Pr\u00fcfung ab \u2026",
+                        "it": "Caricamento ispezione HTTPS \u2026",
+                        "sk": "Na\u010d\u00edtavam HTTPS kontrolu \u2026"},
+    "dlg.fetch_threat": {"en": "Fetching threat prevention \u2026",
+                         "fr": "R\u00e9cup\u00e9ration pr\u00e9vention des menaces \u2026",
+                         "de": "Rufe Bedrohungspr\u00e4vention ab \u2026",
+                         "it": "Caricamento prevenzione minacce \u2026",
+                         "sk": "Na\u010d\u00edtavam ochranu pred hrozbami \u2026"},
+    "dlg.fetch_objects": {"en": "Fetching objects \u2026", "fr": "R\u00e9cup\u00e9ration des objets \u2026",
+                          "de": "Rufe Objekte ab \u2026", "it": "Caricamento oggetti \u2026",
+                          "sk": "Na\u010d\u00edtavam objekty \u2026"},
+    "dlg.sanitizing": {"en": "Sanitizing data \u2026", "fr": "Nettoyage des donn\u00e9es \u2026",
+                       "de": "Bereinige Daten \u2026", "it": "Pulizia dati \u2026",
+                       "sk": "\u010cistenie \u00fadajov \u2026"},
+    "dlg.saving": {"en": "Saving \u2026", "fr": "Enregistrement \u2026", "de": "Speichern \u2026",
+                   "it": "Salvataggio \u2026", "sk": "Uklad\u00e1m \u2026"},
+    "dlg.save_title": {"en": "Save policy as", "fr": "Enregistrer la politique sous",
+                       "de": "Richtlinie speichern unter", "it": "Salva policy come",
+                       "sk": "Ulo\u017ei\u0165 pravidl\u00e1 ako"},
+    "dlg.save_cancelled": {"en": "Save cancelled.", "fr": "Enregistrement annul\u00e9.",
+                           "de": "Speichern abgebrochen.", "it": "Salvataggio annullato.",
+                           "sk": "Ukladanie zru\u0161en\u00e9."},
+    "dlg.loading": {"en": "Loading into GUI \u2026", "fr": "Chargement dans l'interface \u2026",
+                    "de": "Lade in GUI \u2026", "it": "Caricamento nell'interfaccia \u2026",
+                    "sk": "Na\u010d\u00edtavam do GUI \u2026"},
+    "dlg.error_connection": {"en": "Connection failed", "fr": "\u00c9chec de connexion",
+                             "de": "Verbindung fehlgeschlagen", "it": "Connessione fallita",
+                             "sk": "Pripojenie zlyhalo"},
+    "dlg.error_download": {"en": "Download failed", "fr": "\u00c9chec du t\u00e9l\u00e9chargement",
+                           "de": "Download fehlgeschlagen", "it": "Download fallito",
+                           "sk": "S\u0165ahovanie zlyhalo"},
+    "dlg.error_prefix": {"en": "Error: {msg}", "fr": "Erreur : {msg}", "de": "Fehler: {msg}",
+                         "it": "Errore: {msg}", "sk": "Chyba: {msg}"},
+    "dlg.invalid_port": {"en": "Invalid port number.", "fr": "Num\u00e9ro de port invalide.",
+                         "de": "Ung\u00fcltige Portnummer.", "it": "Numero porta non valido.",
+                         "sk": "Neplatn\u00e9 \u010d\u00edslo portu."},
+    "dlg.invalid_timeout": {"en": "Invalid timeout value.", "fr": "D\u00e9lai invalide.",
+                            "de": "Ung\u00fcltiges Zeitlimit.", "it": "Valore timeout non valido.",
+                            "sk": "Neplatn\u00e1 hodnota \u010dasov\u00e9ho limitu."},
+    "dlg.invalid_pagesize": {"en": "Invalid page size value.", "fr": "Taille de page invalide.",
+                             "de": "Ung\u00fcltige Seitengr\u00f6\u00dfe.", "it": "Dimensione pagina non valida.",
+                             "sk": "Neplatn\u00e1 ve\u013ekos\u0165 str\u00e1nky."},
+    "dlg.need_credentials": {"en": "Server and username required.",
+                             "fr": "Serveur et utilisateur requis.",
+                             "de": "Server und Benutzername erforderlich.",
+                             "it": "Server e utente richiesti.",
+                             "sk": "Server a pou\u017e\u00edvate\u013e s\u00fa povinn\u00e9."},
+    "dlg.not_connected": {"en": "Not connected.", "fr": "Non connect\u00e9.",
+                          "de": "Nicht verbunden.", "it": "Non connesso.",
+                          "sk": "Nie je pripojen\u00e9."},
+
+    # ── open file ──
+    "open.title": {"en": "Open Checkpoint policy JSON", "fr": "Ouvrir une politique JSON",
+                   "de": "Checkpoint-Richtlinien-JSON \u00f6ffnen",
+                   "it": "Apri policy JSON Checkpoint", "sk": "Otvori\u0165 JSON pravidiel"},
+    "open.load_error": {"en": "Failed to load:\n{e}", "fr": "\u00c9chec de chargement :\n{e}",
+                        "de": "Laden fehlgeschlagen:\n{e}", "it": "Caricamento fallito:\n{e}",
+                        "sk": "Na\u010d\u00edtanie zlyhalo:\n{e}"},
+    "open.no_fetch": {"en": "fetch_policy.py not found in toolkit directory.",
+                      "fr": "fetch_policy.py introuvable dans le dossier.",
+                      "de": "fetch_policy.py nicht im Toolkit-Verzeichnis gefunden.",
+                      "it": "fetch_policy.py non trovato nella cartella.",
+                      "sk": "fetch_policy.py sa nena\u0161iel v adres\u00e1ri n\u00e1strojov."},
+
+    # ── status bar counters ──
+    "status.objects": {"en": "{count} objects", "fr": "{count} objets", "de": "{count} Objekte",
+                       "it": "{count} oggetti", "sk": "{count} objektov"},
+    "status.nat": {"en": "{count} NAT rules", "fr": "{count} r\u00e8gles NAT",
+                   "de": "{count} NAT-Regeln", "it": "{count} regole NAT",
+                   "sk": "{count} NAT pravidiel"},
+    "status.count_total": {"en": "{count} / {total}", "fr": "{count} / {total}",
+                           "de": "{count} / {total}", "it": "{count} / {total}",
+                           "sk": "{count} / {total}"},
+
+    # ── search operators ──
+    "search.and": {"en": "AND", "fr": "ET", "de": "UND", "it": "E", "sk": "A"},
+    "search.or": {"en": "OR", "fr": "OU", "de": "ODER", "it": "O", "sk": "ALEBO"},
+
+    # ── group expand ──
+    "group.none": {"en": "(none)", "fr": "(aucun)", "de": "(keine)", "it": "(nessuno)", "sk": "(\u017eiadny)"},
+
+    # ── column headings ──
+    "col.name": {"en": "Name", "fr": "Nom", "de": "Name", "it": "Nome", "sk": "N\u00e1zov"},
+    "col.ip-address": {"en": "IP Address", "fr": "Adresse IP", "de": "IP-Adresse", "it": "Indirizzo IP", "sk": "IP adresa"},
+    "col.subnet": {"en": "Subnet", "fr": "Sous-r\u00e9seau", "de": "Subnetz", "it": "Subnet", "sk": "Podsie\u0165"},
+    "col.mask-length": {"en": "Mask Length", "fr": "Longueur masque", "de": "Maskenl\u00e4nge", "it": "Lunghezza maschera", "sk": "D\u013a\u017eka masky"},
+    "col.type": {"en": "Type", "fr": "Type", "de": "Typ", "it": "Tipo", "sk": "Typ"},
+    "col.comments": {"en": "Comments", "fr": "Commentaires", "de": "Kommentare", "it": "Commenti", "sk": "Koment\u00e1re"},
+    "col.category": {"en": "Category", "fr": "Cat\u00e9gorie", "de": "Kategorie", "it": "Categoria", "sk": "Kateg\u00f3ria"},
+    "col.risk": {"en": "Risk", "fr": "Risque", "de": "Risiko", "it": "Rischio", "sk": "Riziko"},
+    "col._objtype": {"en": "Object Type", "fr": "Type d'objet", "de": "Objekttyp", "it": "Tipo oggetto", "sk": "Typ objektu"},
+    "col.layer": {"en": "Layer", "fr": "Couche", "de": "Ebene", "it": "Layer", "sk": "Vrstva"},
+    "col.rule-number": {"en": "Rule #", "fr": "R\u00e8gle n\u00b0", "de": "Regel #", "it": "Regola #", "sk": "Pravidlo #"},
+    "col.rule-id": {"en": "Rule ID", "fr": "ID R\u00e8gle", "de": "Regel-ID", "it": "ID Regola", "sk": "ID Pravidla"},
+    "col.status": {"en": "Status", "fr": "Statut", "de": "Status", "it": "Stato", "sk": "Stav"},
+    "col.source": {"en": "Source", "fr": "Source", "de": "Quelle", "it": "Sorgente", "sk": "Zdroj"},
+    "col.source-ips": {"en": "Source IPs", "fr": "IPs source", "de": "Quell-IPs", "it": "IP sorgente", "sk": "Zdrojov\u00e9 IP"},
+    "col.destination": {"en": "Destination", "fr": "Destination", "de": "Ziel", "it": "Destinazione", "sk": "Cie\u013e"},
+    "col.destination-ips": {"en": "Dest IPs", "fr": "IPs dest.", "de": "Ziel-IPs", "it": "IP destinazione", "sk": "Cie\u013eov\u00e9 IP"},
+    "col.service": {"en": "Service", "fr": "Service", "de": "Dienst", "it": "Servizio", "sk": "Slu\u017eba"},
+    "col.service-ports": {"en": "Service Ports", "fr": "Ports service", "de": "Dienst-Ports", "it": "Porte servizio", "sk": "Porty slu\u017eby"},
+    "col.action": {"en": "Action", "fr": "Action", "de": "Aktion", "it": "Azione", "sk": "Akcia"},
+    "col.track": {"en": "Track", "fr": "Suivi", "de": "Verfolgung", "it": "Traccia", "sk": "Sledovanie"},
+    "col.uid": {"en": "UID", "fr": "UID", "de": "UID", "it": "UID", "sk": "UID"},
+    "col.hits": {"en": "Hits", "fr": "Hits", "de": "Treffer", "it": "Hit", "sk": "Z\u00e1sahy"},
+    "col.creation-time": {"en": "Created", "fr": "Cr\u00e9\u00e9", "de": "Erstellt", "it": "Creato", "sk": "Vytvoren\u00e9"},
+    "col.last-modified": {"en": "Modified", "fr": "Modifi\u00e9", "de": "Ge\u00e4ndert", "it": "Modificato", "sk": "Upraven\u00e9"},
+    "col.original-source": {"en": "Orig. Source", "fr": "Source d'orig.", "de": "Orig. Quelle", "it": "Sorg. orig.", "sk": "P\u00f4v. zdroj"},
+    "col.original-source-ips": {"en": "Orig. Source IPs", "fr": "IPs source orig.", "de": "Orig. Quell-IPs", "it": "IP sorg. orig.", "sk": "P\u00f4v. zdrojov\u00e9 IP"},
+    "col.original-destination": {"en": "Orig. Dest.", "fr": "Dest. d'orig.", "de": "Orig. Ziel", "it": "Dest. orig.", "sk": "P\u00f4v. cie\u013e"},
+    "col.original-destination-ips": {"en": "Orig. Dest IPs", "fr": "IPs dest. orig.", "de": "Orig. Ziel-IPs", "it": "IP dest. orig.", "sk": "P\u00f4v. cie\u013eov\u00e9 IP"},
+    "col.original-service": {"en": "Orig. Service", "fr": "Service orig.", "de": "Orig. Dienst", "it": "Serv. orig.", "sk": "P\u00f4v. slu\u017eba"},
+    "col.original-service-ports": {"en": "Orig. Service Ports", "fr": "Ports service orig.", "de": "Orig. Dienst-Ports", "it": "Porte serv. orig.", "sk": "P\u00f4v. porty slu\u017eby"},
+    "col.translated-source": {"en": "Trans. Source", "fr": "Source traduite", "de": "\u00dcbers. Quelle", "it": "Sorg. tradotta", "sk": "Prelo\u017een\u00fd zdroj"},
+    "col.translated-source-ips": {"en": "Trans. Source IPs", "fr": "IPs source trad.", "de": "\u00dcbers. Quell-IPs", "it": "IP sorg. trad.", "sk": "Prelo\u017een\u00e9 zdrojov\u00e9 IP"},
+    "col.translated-destination": {"en": "Trans. Dest.", "fr": "Dest. traduite", "de": "\u00dcbers. Ziel", "it": "Dest. tradotta", "sk": "Prelo\u017een\u00fd cie\u013e"},
+    "col.translated-destination-ips": {"en": "Trans. Dest IPs", "fr": "IPs dest. trad.", "de": "\u00dcbers. Ziel-IPs", "it": "IP dest. trad.", "sk": "Prelo\u017een\u00e9 cie\u013eov\u00e9 IP"},
+    "col.translated-service": {"en": "Trans. Service", "fr": "Service traduit", "de": "\u00dcbers. Dienst", "it": "Serv. tradotto", "sk": "Prelo\u017een\u00e1 slu\u017eba"},
+    "col.translated-service-ports": {"en": "Trans. Service Ports", "fr": "Ports service trad.", "de": "\u00dcbers. Dienst-Ports", "it": "Porte serv. trad.", "sk": "Prelo\u017een\u00e9 porty slu\u017eby"},
+    "col.method": {"en": "Method", "fr": "M\u00e9thode", "de": "Methode", "it": "Metodo", "sk": "Met\u00f3da"},
+    "col.install-on": {"en": "Install On", "fr": "Installer sur", "de": "Installieren auf", "it": "Installa su", "sk": "In\u0161talova\u0165 na"},
+}
+
+
+class Lang:
+    """Simple translation helper.  Usage: L = Lang("en"); L("app.title") or L("app.title_file", name)."""
+
+    def __init__(self, code="en"):
+        self.code = code if code in LANG_CODES else "en"
+
+    def set(self, code):
+        self.code = code if code in LANG_CODES else "en"
+
+    def get_flag(self, code=None):
+        code = code or self.code
+        return FLAGS.get(code, code.upper())
+
+    def __call__(self, key, **kwargs):
+        entry = T.get(key)
+        if entry is None:
+            logging.warning("Missing translation key: %s", key)
+            return key
+        text = entry.get(self.code) or entry.get("en", key)
+        if kwargs:
+            text = text.format(**kwargs)
+        return text
+
+
+# Global singleton for easy import
+L = Lang("en")
+
+
+def set_language(code):
+    L.set(code)

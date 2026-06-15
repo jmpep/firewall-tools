@@ -10,6 +10,8 @@
 #from Python
 # --- Python cache ---
 __pycache__/
+checkpoint_toolkit/__pycache__/
+firewall-import/__pycache__/
 *.py[cod]
 *.pyo
 # --- Virtual environments ---
@@ -64,3 +66,5 @@ terraform.tfvars
 
 #do not save the csv and json default in outputs
 /outputs
+/logs
+
