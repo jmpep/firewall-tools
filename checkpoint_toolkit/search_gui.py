@@ -302,6 +302,67 @@ def flatten_nat_for_display(rule, lookup):
     }
 
 
+def extract_proxy_rules(data):
+    """Yield proxy policy rules."""
+    for r in data.get('policy-package', {}).get('proxy-policy', {}).get('rules', []):
+        yield r
+
+
+def flatten_proxy_for_display(rule, lookup):
+    def _names(arr):
+        if not isinstance(arr, list):
+            return str(arr)
+        parts = []
+        for o in arr:
+            if not isinstance(o, dict):
+                parts.append(str(o))
+                continue
+            name = o.get('name', '')
+            ip = _resolve_ip(lookup, name)
+            if ip:
+                parts.append(f"{name} [{ip}]")
+            else:
+                parts.append(name)
+        return '; '.join(parts)
+
+    action = rule.get('action', {})
+    if isinstance(action, dict):
+        action = action.get('name', '')
+    install = rule.get('install-on', {})
+    if isinstance(install, dict):
+        install = install.get('name', '')
+
+    extra = rule.get('extra', {}) or {}
+    uid = rule.get('uid', '')
+    meta = rule.get('meta-info', {}) or {}
+    hm = rule.get('hits', {}) or {}
+
+    return {
+        "rule-number": rule.get('rule-number', ''),
+        "rule-id": uid,
+        "name": rule.get('name', ''),
+        "status": "Disabled" if rule.get('enabled') is False else "Enabled",
+        "proxy-type": extra.get('proxy-type', ''),
+        "source": _names(rule.get('source', [])),
+        "destination": _names(rule.get('destination', [])),
+        "service": _names(rule.get('service', [])),
+        "source-interface": extra.get('source-interface', ''),
+        "destination-interface": extra.get('destination-interface', ''),
+        "action": action,
+        "schedule": extra.get('schedule', ''),
+        "transparent": "Yes" if extra.get('transparent') else "",
+        "webcache": "Yes" if extra.get('webcache') else "",
+        "disclaimer": extra.get('disclaimer', ''),
+        "redirect-url": extra.get('redirect-url', ''),
+        "webproxy-profile": extra.get('webproxy-profile', ''),
+        "http-tunnel-auth": "Yes" if extra.get('http-tunnel-auth') else "",
+        "profile-group": extra.get('profile-group', ''),
+        "comments": rule.get('comments', ''),
+        "track": rule.get('track', ''),
+        "uid": uid,
+    }
+
+
 def collect_objects(data):
     """Return a flat list of object dicts."""
     objs = []
@@ -328,6 +389,13 @@ class SearchGUI:
                 "translated-service", "translated-service-ports",
                 "method", "action", "install-on", "comments",
                 "uid", "hits", "creation-time", "last-modified")
+    PROXY_COLS = ("rule-number", "rule-id", "name", "status", "proxy-type",
+                  "source", "destination", "service",
+                  "source-interface", "destination-interface",
+                  "action", "schedule",
+                  "transparent", "webcache", "disclaimer",
+                  "redirect-url", "webproxy-profile", "http-tunnel-auth",
+                  "profile-group", "comments", "track", "uid")
     RULE_COLS = ("layer", "rule-number", "rule-id", "name", "status",
                  "source", "source-ips",
                  "destination", "destination-ips",
@@ -348,6 +416,7 @@ class SearchGUI:
         self._groups = {}
         self.all_rules = []
         self.all_nat_rules = []
+        self.all_proxy_rules = []
 
         settings = load_settings()
         self.page_size = settings.get("page_size", 200)
@@ -458,6 +527,11 @@ class SearchGUI:
         nat_frame = ttk.Frame(self.nb)
         self.nb.add(nat_frame, text=L("tab.nat"))
         self._build_nat_tab(nat_frame)
+
+        # -- proxy search tab
+        proxy_frame = ttk.Frame(self.nb)
+        self.nb.add(proxy_frame, text=L("tab.proxy"))
+        self._build_proxy_tab(proxy_frame)
 
         # ---- status bar
         status_frame = ttk.Frame(root)
@@ -887,6 +961,130 @@ class SearchGUI:
         msg = json.dumps(vals, indent=2, ensure_ascii=False)
         messagebox.showinfo(L("detail.nat"), msg)
 
+    # ============================================================ proxy tab
+
+    def _build_proxy_tab(self, parent):
+        top = ttk.Frame(parent)
+        top.pack(fill=tk.X, padx=5, pady=5)
+        w = ttk.Label(top, text=L("search.placeholder")); w.pack(side=tk.LEFT)
+        self._lang_widgets.append((w, "search.placeholder"))
+        self.proxy_search_var = tk.StringVar()
+        self.proxy_search_var.trace_add('write', lambda *a: self._do_proxy_search())
+        e = ttk.Entry(top, textvariable=self.proxy_search_var, width=60)
+        e.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        w = ttk.Label(top, text=L("search.hint_rules")); w.pack(side=tk.LEFT)
+        self._lang_widgets.append((w, "search.hint_rules"))
+        self.proxy_count_label = ttk.Label(top, text="")
+        self.proxy_count_label.pack(side=tk.RIGHT, padx=5)
+
+        btn_frame = ttk.Frame(parent)
+        btn_frame.pack(fill=tk.X, padx=5, pady=2)
+        w = ttk.Button(btn_frame, text=L("export.all_csv"),
+                   command=self._export_proxy_all); w.pack(side=tk.LEFT, padx=2)
+        self._lang_widgets.append((w, "export.all_csv"))
+        w = ttk.Button(btn_frame, text=L("export.searched_csv"),
+                   command=self._export_proxy_searched); w.pack(side=tk.LEFT, padx=2)
+        self._lang_widgets.append((w, "export.searched_csv"))
+
+        tree_frame = ttk.Frame(parent)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+
+        c = self.PROXY_COLS
+        self.proxy_tree = ttk.Treeview(tree_frame, columns=c, show='headings',
+                                       selectmode='extended')
+        for col in c:
+            self.proxy_tree.heading(col, text=L("col." + col), command=lambda _c=col: self._sort(self.proxy_tree, _c, False))
+            self.proxy_tree.column(col, width=120, minwidth=60)
+        self.proxy_tree.column("rule-id", width=160)
+        self.proxy_tree.column("name", width=200)
+        self.proxy_tree.column("source", width=180)
+        self.proxy_tree.column("destination", width=180)
+        self.proxy_tree.column("redirect-url", width=200)
+        self.proxy_tree.column("comments", width=200)
+        self.proxy_tree._col_lang_key = "col."
+
+        vsb = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.proxy_tree.yview)
+        hsb = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.proxy_tree.xview)
+        self.proxy_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+
+        self.proxy_tree.grid(row=0, column=0, sticky='nsew')
+        vsb.grid(row=0, column=1, sticky='ns')
+        hsb.grid(row=1, column=0, sticky='ew')
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+
+        self.proxy_tree.bind("<Double-1>", self._proxy_detail)
+
+    def _do_proxy_search(self):
+        self.proxy_tree.delete(*self.proxy_tree.get_children())
+        raw = self.proxy_search_var.get().strip()
+        if not raw or not self.all_proxy_rules:
+            self.proxy_count_label.config(text=L("search.count_proxy", n=len(self.all_proxy_rules)))
+            for r in self.all_proxy_rules:
+                self.proxy_tree.insert('', tk.END,
+                                       values=tuple(flatten_proxy_for_display(r, self.lookup).values()))
+            return
+
+        matched = self._eval_proxy_query(raw)
+        for r in matched:
+            self.proxy_tree.insert('', tk.END,
+                                   values=tuple(flatten_proxy_for_display(r, self.lookup).values()))
+        self.proxy_count_label.config(text=L("search.count_matched", n=len(matched), total=len(self.all_proxy_rules)))
+
+    def _eval_proxy_query(self, raw):
+        def _clause_matches(rule, clause):
+            clause = clause.strip()
+            flat = flatten_proxy_for_display(rule, self.lookup)
+            if ':' not in clause:
+                for field in ('name', 'proxy-type', 'source', 'destination',
+                              'webproxy-profile', 'redirect-url', 'comments'):
+                    if match_pattern(flat.get(field, ''), clause):
+                        return True
+                return False
+            field, _, pat = clause.partition(':')
+            field = field.strip().lower()
+            pat = pat.strip()
+            if field in flat:
+                return match_pattern(flat[field], pat)
+            return False
+
+        or_parts = re.split(r'\s+OR\s+', raw, flags=re.IGNORECASE)
+        results = []
+        for or_part in or_parts:
+            and_parts = re.split(r'\s+AND\s+', or_part, flags=re.IGNORECASE)
+            for rule in self.all_proxy_rules:
+                if all(_clause_matches(rule, c) for c in and_parts):
+                    results.append(rule)
+        return results
+
+    def _get_matching_proxy(self):
+        all_flat = [flatten_proxy_for_display(r, self.lookup) for r in self.all_proxy_rules]
+        raw = self.proxy_search_var.get().strip()
+        if not raw:
+            return all_flat, all_flat
+        matched = self._eval_proxy_query(raw)
+        matched_set = set(id(r) for r in matched)
+        searched = [flatten_proxy_for_display(r, self.lookup)
+                    for r in self.all_proxy_rules if id(r) in matched_set]
+        return all_flat, searched
+
+    def _export_proxy_all(self):
+        all_flat, _ = self._get_matching_proxy()
+        self._export_to_csv(all_flat, "proxy_all.csv")
+
+    def _export_proxy_searched(self):
+        _, searched = self._get_matching_proxy()
+        self._export_to_csv(searched, "proxy_searched.csv")
+
+    def _proxy_detail(self, event):
+        sel = self.proxy_tree.selection()
+        if not sel:
+            return
+        item = self.proxy_tree.item(sel[0])
+        vals = {c: v for c, v in zip(self.PROXY_COLS, item['values'])}
+        msg = json.dumps(vals, indent=2, ensure_ascii=False)
+        messagebox.showinfo(L("detail.proxy"), msg)
+
     # ============================================================ status / progress
 
     def _set_status(self, text):
@@ -943,12 +1141,14 @@ class SearchGUI:
             self.nb.tab(0, text=L("tab.objects"))
             self.nb.tab(1, text=L("tab.rules"))
             self.nb.tab(2, text=L("tab.nat"))
+            self.nb.tab(3, text=L("tab.proxy"))
         except tk.TclError:
             pass
         self._do_obj_search()
         self._do_rule_search()
         self._do_nat_search()
-        for tree in (self.obj_tree, self.rule_tree, self.nat_tree):
+        self._do_proxy_search()
+        for tree in (self.obj_tree, self.rule_tree, self.nat_tree, self.proxy_tree):
             try:
                 prefix = getattr(tree, '_col_lang_key', '')
                 if prefix:
@@ -976,7 +1176,7 @@ class SearchGUI:
     def _settings_dialog(self):
         dlg = tk.Toplevel(self.root)
         dlg.title(L("settings.title"))
-        dlg.geometry("480x380")
+        dlg.geometry("500x390")
         dlg.transient(self.root)
         dlg.grab_set()
         dlg.resizable(False, False)
@@ -1057,7 +1257,6 @@ class SearchGUI:
 
         dlg = tk.Toplevel(self.root)
         dlg.title(L("dlg.title"))
-        dlg.geometry("620x620")
         dlg.transient(self.root)
         dlg.grab_set()
         dlg.resizable(True, True)
@@ -1065,13 +1264,14 @@ class SearchGUI:
         # -- connection frame
         cf = ttk.LabelFrame(dlg, text=L("dlg.connection"), padding=10)
         cf.pack(fill=tk.X, padx=10, pady=5)
+        cf.columnconfigure(1, weight=1)
 
         ttk.Label(cf, text=L("dlg.server")).grid(row=0, column=0, sticky=tk.W, pady=2)
-        server_var = tk.StringVar(value=settings.get("last_server", "192.168.1.1"))
+        server_var = tk.StringVar(value=settings.get("last_server") or "192.168.1.1")
         ttk.Entry(cf, textvariable=server_var, width=40).grid(row=0, column=1, padx=5, pady=2)
 
         ttk.Label(cf, text=L("dlg.username")).grid(row=1, column=0, sticky=tk.W, pady=2)
-        user_var = tk.StringVar(value=settings.get("last_username", "admin"))
+        user_var = tk.StringVar(value=settings.get("last_username") or "admin")
         ttk.Entry(cf, textvariable=user_var, width=40).grid(row=1, column=1, padx=5, pady=2)
 
         ttk.Label(cf, text=L("dlg.password")).grid(row=2, column=0, sticky=tk.W, pady=2)
@@ -1104,8 +1304,27 @@ class SearchGUI:
         out_dir_var = tk.StringVar(value=settings.get("last_output_dir", self.download_dir))
         ttk.Entry(cf, textvariable=out_dir_var, width=30).grid(row=7, column=1, sticky=tk.W, padx=5, pady=2)
 
-        connect_btn = ttk.Button(cf, text=L("dlg.connect"))
-        connect_btn.grid(row=8, column=0, columnspan=2, pady=6)
+        # -- button row: connect, cancel, download
+        btn_row = ttk.Frame(cf)
+        btn_row.grid(row=8, column=0, columnspan=2, pady=6, sticky=tk.EW)
+        def _select_all():
+            for cb in layer_checkboxes:
+                cb[1].set(True)
+        def _clear_all():
+            for cb in layer_checkboxes:
+                cb[1].set(False)
+        ttk.Button(btn_row, text=L("dlg.select_all"), command=_select_all).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_row, text=L("dlg.clear_all"), command=_clear_all).pack(side=tk.LEFT, padx=2)
+        ttk.Label(btn_row, text=L("dlg.policy_name")).pack(side=tk.LEFT, padx=(20, 2))
+        pkg_var = tk.StringVar(value=settings.get("last_policy_name", "fetched_policy"))
+        ttk.Entry(btn_row, textvariable=pkg_var, width=20).pack(side=tk.LEFT, padx=2)
+        # spacer
+        ttk.Label(btn_row, text="").pack(side=tk.LEFT, fill=tk.X, expand=True)
+        connect_btn = ttk.Button(btn_row, text=L("dlg.connect"))
+        connect_btn.pack(side=tk.LEFT, padx=2)
+        download_btn = ttk.Button(btn_row, text=L("dlg.download_btn"), state=tk.DISABLED)
+        download_btn.pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_row, text=L("dlg.cancel"), command=dlg.destroy).pack(side=tk.LEFT, padx=2)
 
         # -- layers frame
         lf = ttk.LabelFrame(dlg, text=L("dlg.layers_frame"), padding=10)
@@ -1121,28 +1340,6 @@ class SearchGUI:
         layer_canvas.configure(yscrollcommand=layer_scroll.set)
         layer_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         layer_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # -- bottom buttons
-        bf = ttk.Frame(dlg)
-        bf.pack(fill=tk.X, padx=10, pady=5)
-
-        def _select_all():
-            for cb in layer_checkboxes:
-                cb[1].set(True)
-        def _clear_all():
-            for cb in layer_checkboxes:
-                cb[1].set(False)
-
-        ttk.Button(bf, text=L("dlg.select_all"), command=_select_all).pack(side=tk.LEFT, padx=2)
-        ttk.Button(bf, text=L("dlg.clear_all"), command=_clear_all).pack(side=tk.LEFT, padx=2)
-
-        ttk.Label(bf, text=L("dlg.policy_name")).pack(side=tk.LEFT, padx=(20, 2))
-        pkg_var = tk.StringVar(value=settings.get("last_policy_name", "fetched_policy"))
-        ttk.Entry(bf, textvariable=pkg_var, width=20).pack(side=tk.LEFT, padx=2)
-
-        download_btn = ttk.Button(bf, text=L("dlg.download_btn"), state=tk.DISABLED)
-        download_btn.pack(side=tk.RIGHT, padx=2)
-        ttk.Button(bf, text=L("dlg.cancel"), command=dlg.destroy).pack(side=tk.RIGHT, padx=2)
 
         status_var = tk.StringVar(value=L("dlg.status_connect"))
         status_bar = ttk.Label(dlg, textvariable=status_var, relief=tk.SUNKEN, anchor=tk.W)
@@ -1412,11 +1609,13 @@ class SearchGUI:
         self._build_group_lookup()
         self.all_rules = list(extract_rules(self.data))
         self.all_nat_rules = list(extract_nat_rules(self.data))
+        self.all_proxy_rules = list(extract_proxy_rules(self.data))
         self.file_label.config(text=os.path.basename(path))
         self.root.title(L("app.title_file", name=os.path.basename(path)))
         self._do_obj_search()
         self._do_rule_search()
         self._do_nat_search()
+        self._do_proxy_search()
         self._show_progress(False)
         self._set_status("")
 

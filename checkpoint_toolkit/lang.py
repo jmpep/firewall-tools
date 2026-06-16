@@ -70,6 +70,8 @@ T = {
     "tab.rules": {"en": "Rules", "fr": "R\u00e8gles", "de": "Regeln", "it": "Regole", "sk": "Pravidl\u00e1"},
     "tab.nat": {"en": "NAT Rules", "fr": "R\u00e8gles NAT", "de": "NAT-Regeln", "it": "Regole NAT",
                 "sk": "NAT pravidl\u00e1"},
+    "tab.proxy": {"en": "Proxy Policies", "fr": "R\u00e8gles proxy", "de": "Proxy-Richtlinien",
+                  "it": "Regole proxy", "sk": "Proxy pravidl\u00e1"},
 
     # ── search ──
     "search.placeholder": {"en": "Search:", "fr": "Recherche :", "de": "Suche:", "it": "Cerca:", "sk": "H\u013eadanie:"},
@@ -101,6 +103,9 @@ T = {
     "search.count_nat": {"en": "{n} NAT rules", "fr": "{n} r\u00e8gles NAT",
                          "de": "{n} NAT-Regeln", "it": "{n} regole NAT",
                          "sk": "{n} NAT pravidiel"},
+    "search.count_proxy": {"en": "{n} proxy policies", "fr": "{n} r\u00e8gles proxy",
+                           "de": "{n} Proxy-Richtlinien", "it": "{n} regole proxy",
+                           "sk": "{n} proxy pravidiel"},
 
     # ── split options ──
     "split.split": {"en": "Split", "fr": "Diviser", "de": "Aufteilen", "it": "Dividi", "sk": "Rozdeli\u0165"},
@@ -144,6 +149,9 @@ T = {
                     "it": "Dettaglio regola", "sk": "Podrobnosti pravidla"},
     "detail.nat": {"en": "NAT rule detail", "fr": "D\u00e9tail r\u00e8gle NAT", "de": "NAT-Regeldetail",
                    "it": "Dettaglio regola NAT", "sk": "Podrobnosti NAT pravidla"},
+    "detail.proxy": {"en": "Proxy policy detail", "fr": "D\u00e9tail r\u00e8gle proxy",
+                     "de": "Proxy-Richtlinien-Detail", "it": "Dettaglio regola proxy",
+                     "sk": "Podrobnosti proxy pravidla"},
     "detail.object": {"en": "Object detail", "fr": "D\u00e9tail de l'objet", "de": "Objektdetails",
                       "it": "Dettaglio oggetto", "sk": "Podrobnosti objektu"},
 
@@ -387,6 +395,19 @@ T = {
     "col.translated-service-ports": {"en": "Trans. Service Ports", "fr": "Ports service trad.", "de": "\u00dcbers. Dienst-Ports", "it": "Porte serv. trad.", "sk": "Prelo\u017een\u00e9 porty slu\u017eby"},
     "col.method": {"en": "Method", "fr": "M\u00e9thode", "de": "Methode", "it": "Metodo", "sk": "Met\u00f3da"},
     "col.install-on": {"en": "Install On", "fr": "Installer sur", "de": "Installieren auf", "it": "Installa su", "sk": "In\u0161talova\u0165 na"},
+
+    # ── proxy columns ──
+    "col.proxy-type": {"en": "Proxy Type", "fr": "Type proxy", "de": "Proxy-Typ", "it": "Tipo proxy", "sk": "Typ proxy"},
+    "col.source-interface": {"en": "Src Interface", "fr": "Interface src", "de": "Quellschnittstelle", "it": "Interfaccia sorg.", "sk": "Zdroj. rozhranie"},
+    "col.destination-interface": {"en": "Dst Interface", "fr": "Interface dst", "de": "Zielschnittstelle", "it": "Interfaccia dest.", "sk": "Cie\u013e. rozhranie"},
+    "col.schedule": {"en": "Schedule", "fr": "Planification", "de": "Zeitplan", "it": "Pianificazione", "sk": "Harmonogram"},
+    "col.transparent": {"en": "Transparent", "fr": "Transparent", "de": "Transparent", "it": "Trasparente", "sk": "Transparentn\u00fd"},
+    "col.webcache": {"en": "Web Cache", "fr": "Cache web", "de": "Web-Cache", "it": "Cache web", "sk": "Web cache"},
+    "col.disclaimer": {"en": "Disclaimer", "fr": "Avertissement", "de": "Haftungsausschluss", "it": "Disclaimer", "sk": "Vyhl\u00e1senie"},
+    "col.redirect-url": {"en": "Redirect URL", "fr": "URL redirection", "de": "Weiterleitungs-URL", "it": "URL reindirizzamento", "sk": "URL presmerovania"},
+    "col.webproxy-profile": {"en": "Web Proxy Profile", "fr": "Profil proxy web", "de": "Web-Proxy-Profil", "it": "Profilo proxy web", "sk": "Profil web proxy"},
+    "col.http-tunnel-auth": {"en": "HTTP Tunnel Auth", "fr": "Auth tunnel HTTP", "de": "HTTP-Tunnel-Auth", "it": "Auth tunnel HTTP", "sk": "HTTP tunel aut."},
+    "col.profile-group": {"en": "Profile Group", "fr": "Groupe profil", "de": "Profilgruppe", "it": "Gruppo profilo", "sk": "Skupina profilov"},
 }
 
 

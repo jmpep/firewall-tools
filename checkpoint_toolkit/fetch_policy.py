@@ -175,7 +175,7 @@ class CheckpointAPIClient:
                 key = result_key
             else:
                 key = endpoint.replace("show-", "").replace("-", "_")
-            items = res.get(key) or res.get("objects") or res.get("rulebase") or []
+            items = res.get(key) or []
             if not items:
                 break
             all_data.extend(items)
@@ -258,20 +258,23 @@ class CheckpointAPIClient:
             layer = {"name": name, "uid": rb.get("uid", ""),
                      "rules": [], "inline-layers": []}
             seen = set()
-            for item in rb.get("rulebase", []):
-                t = item.get("type", "")
-                uid = item.get("uid", "")
-                if uid in seen:
-                    continue
-                seen.add(uid)
-                if t == "access-rule":
-                    layer["rules"].append(item)
-                elif t == "inline-layer":
-                    layer["inline-layers"].append(item)
-                elif t == "access-section":
-                    pass
-                else:
-                    layer["rules"].append(item)
+            def _extract(items):
+                for item in items:
+                    t = item.get("type", "")
+                    uid = item.get("uid", "")
+                    if uid in seen:
+                        continue
+                    seen.add(uid)
+                    if t == "access-rule":
+                        layer["rules"].append(item)
+                    elif t == "inline-layer":
+                        _extract(item.get("rulebase", []))
+                        layer["inline-layers"].append(item)
+                    elif t == "access-section":
+                        _extract(item.get("rulebase", []))
+                    else:
+                        layer["rules"].append(item)
+            _extract(rb.get("rulebase", []))
             access_policy["layers"].append(layer)
 
         print("  Fetching HTTPS inspection policy ...")
@@ -372,18 +375,13 @@ class PaloAltoAPIClient:
             services = self._parse_members(entry.find("service"))
             action_el = entry.find("action")
             action = action_el.text.strip() if action_el is not None else "allow"
-            log_el = entry.find("log-start") or entry.find("log-end")
-            track = "Log"
-            if log_el is not None:
-                track = f"Log at {'Start' if log_el.tag == 'log-start' else 'Session End'}"
             comment_el = entry.find("description")
             comments = comment_el.text.strip() if comment_el is not None else ""
             src_zone = self._parse_members(entry.find("from"), tag="member")
             dst_zone = self._parse_members(entry.find("to"), tag="member")
             apps = self._parse_members(entry.find("application"))
             users = self._parse_members(entry.find("source-user"))
-            profile_el = entry.find("profile-setting/group")
-            profiles = [profile_el.text.strip()] if profile_el is not None and profile_el.text else []
+            categories = self._parse_members(entry.find("category"))
 
             extra = {}
             if src_zone:
@@ -394,15 +392,45 @@ class PaloAltoAPIClient:
                 extra["application"] = [{"name": a} for a in apps]
             if users:
                 extra["user"] = [{"name": u} for u in users]
-            if profiles:
-                extra["profile"] = profiles
+            if categories:
+                extra["category"] = [{"name": c} for c in categories]
+
+            log_start_el = entry.find("log-start")
+            log_end_el = entry.find("log-end")
+            track = "Log"
+            if log_start_el is not None and log_start_el.text == "yes":
+                track = "Log at Start"
+            if log_end_el is not None and log_end_el.text == "yes":
+                track = "Log at Session End" if track == "Log" else "Log at Start & End"
+
+            log_setting_el = entry.find("log-setting")
+            if log_setting_el is not None and log_setting_el.text:
+                extra["log-setting"] = log_setting_el.text.strip()
+
+            schedule_el = entry.find("schedule")
+            schedule = schedule_el.text.strip() if schedule_el is not None and schedule_el.text else ""
+
+            profile_el = entry.find("profile-setting/group")
+            if profile_el is not None and profile_el.text:
+                extra["group"] = profile_el.text.strip()
+
+            neg_src = entry.find("negate-source")
+            if neg_src is not None and neg_src.text == "yes":
+                extra["negate-source"] = True
+            neg_dst = entry.find("negate-destination")
+            if neg_dst is not None and neg_dst.text == "yes":
+                extra["negate-destination"] = True
+
+            icmp_el = entry.find("icmp-unreachable")
+            if icmp_el is not None and icmp_el.text == "yes":
+                extra["icmp-unreachable"] = True
 
             uid = entry.get("uuid", f"pa-rule-{i:04d}")
             rules.append(_common_rule(
                 i, name, uid, enabled,
                 sources or ["Any"], destinations or ["Any"], services or ["Any"],
                 action.capitalize(), track, comments,
-                install_on=None, extra=extra,
+                install_on=None, time_obj=schedule or None, extra=extra,
             ))
         return rules
 
@@ -431,25 +459,79 @@ class PaloAltoAPIClient:
             src = self._parse_members(entry.find("source"))
             dst = self._parse_members(entry.find("destination"))
             svc = self._parse_members(entry.find("service"))
-            src_trans = self._parse_members(entry.find("source-translation"))
-            dst_trans = self._parse_members(entry.find("destination-translation"))
+            src_trans_el = entry.find("source-translation")
+            dst_trans_el = entry.find("destination-translation")
+            nat_type_el = entry.find("nat-type")
+            nat_type = nat_type_el.text.strip() if nat_type_el is not None else "ipv4"
+
+            src_trans_type = "static"
+            src_trans_addrs = ["Original"]
+            dst_trans_addr = ""
+            dst_trans_port = ""
+            bi_directional = False
+            method = "static"
+
+            if src_trans_el is not None:
+                static_ip = src_trans_el.find("static-ip")
+                dynamic_ip = src_trans_el.find("dynamic-ip")
+                dyn_ip_port = src_trans_el.find("dynamic-ip-and-port")
+                if static_ip is not None:
+                    ta = static_ip.find("translated-address")
+                    if ta is not None:
+                        src_trans_addrs = [ta.text.strip()] if ta.text else ["Original"]
+                    bd = static_ip.find("bi-directional")
+                    if bd is not None and bd.text == "yes":
+                        bi_directional = True
+                elif dynamic_ip is not None:
+                    src_trans_type = "dynamic-ip"
+                    method = "dynamic-ip"
+                    ta = dynamic_ip.find("translated-address")
+                    if ta is not None:
+                        src_trans_addrs = [m.text.strip() for m in ta.findall("member") if m.text]
+                    if not src_trans_addrs:
+                        interface = dynamic_ip.find("interface")
+                        if interface is not None and interface.text:
+                            src_trans_addrs = [f"interface:{interface.text.strip()}"]
+                elif dyn_ip_port is not None:
+                    src_trans_type = "dynamic-ip-and-port"
+                    method = "dynamic-ip-and-port"
+                    ta = dyn_ip_port.find("translated-address")
+                    if ta is not None:
+                        src_trans_addrs = [m.text.strip() for m in ta.findall("member") if m.text]
+                    if not src_trans_addrs:
+                        interface = dyn_ip_port.find("interface")
+                        if interface is not None and interface.text:
+                            src_trans_addrs = [f"interface:{interface.text.strip()}"]
+
+            if dst_trans_el is not None:
+                ta = dst_trans_el.find("translated-address")
+                if ta is not None and ta.text:
+                    dst_trans_addr = ta.text.strip()
+                tp = dst_trans_el.find("translated-port")
+                if tp is not None and tp.text:
+                    dst_trans_port = tp.text.strip()
 
             nat_rules.append({
                 "rule-number": str(i),
                 "name": name,
                 "uid": entry.get("uuid", f"pa-nat-{i:04d}"),
                 "enabled": enabled,
-                "method": "static",
+                "method": method,
+                "nat-type": nat_type,
                 "original-source": [{"name": s} for s in (src or ["Any"])],
                 "original-destination": [{"name": d} for d in (dst or ["Any"])],
                 "original-service": [{"name": s} for s in (svc or ["Any"])],
-                "translated-source": [{"name": s} for s in (src_trans or ["Original"])],
-                "translated-destination": [{"name": d} for d in (dst_trans or ["Original"])],
+                "translated-source": [{"name": s} for s in src_trans_addrs],
+                "translated-destination": [{"name": d} for d in ([dst_trans_addr] if dst_trans_addr else ["Original"])],
                 "translated-service": [{"name": "Original"}],
                 "action": {"name": "translate"},
                 "install-on": {"name": ""},
-                "comments": "",
+                "comments": entry.findtext("description", ""),
             })
+            if bi_directional:
+                nat_rules[-1]["bi-directional"] = True
+            if dst_trans_port:
+                nat_rules[-1]["translated-port"] = dst_trans_port
         return nat_rules
 
     def _fetch_addresses(self):
@@ -460,6 +542,7 @@ class PaloAltoAPIClient:
             name = entry.get("name", "")
             ip_netmask = entry.find("ip-netmask")
             ip_range = entry.find("ip-range")
+            ip_wildcard = entry.find("ip-wildcard")
             fqdn = entry.find("fqdn")
             if ip_netmask is not None and ip_netmask.text:
                 val = ip_netmask.text.strip()
@@ -470,9 +553,143 @@ class PaloAltoAPIClient:
                     hosts.append({"name": name, "ip-address": val, "type": "ip-netmask"})
             elif ip_range is not None and ip_range.text:
                 hosts.append({"name": name, "ip-address": ip_range.text.strip(), "type": "ip-range"})
+            elif ip_wildcard is not None and ip_wildcard.text:
+                hosts.append({"name": name, "ip-address": ip_wildcard.text.strip(), "type": "ip-wildcard"})
             elif fqdn is not None and fqdn.text:
                 hosts.append({"name": name, "ip-address": fqdn.text.strip(), "type": "fqdn"})
         return hosts, networks
+
+    def _fetch_service_groups(self):
+        groups = []
+        result = self._xpath_get("/config/devices/entry/vsys/entry/service-group")
+        for entry in result.findall(".//entry"):
+            name = entry.get("name", "")
+            members = [{"name": m.text.strip()} for m in entry.findall(".//member") if m.text]
+            if members:
+                groups.append({"name": name, "members": members})
+        return groups
+
+    def _fetch_application_groups(self):
+        groups = []
+        result = self._xpath_get("/config/devices/entry/vsys/entry/application-group")
+        for entry in result.findall(".//entry"):
+            name = entry.get("name", "")
+            members = [{"name": m.text.strip()} for m in entry.findall(".//member") if m.text]
+            if members:
+                groups.append({"name": name, "members": members})
+        return groups
+
+    def _fetch_tags(self):
+        tags = []
+        result = self._xpath_get("/config/devices/entry/vsys/entry/tag")
+        for entry in result.findall(".//entry"):
+            name = entry.get("name", "")
+            color = entry.findtext("color", "")
+            comments = entry.findtext("comments", "")
+            tag = {"name": name}
+            if color:
+                tag["color"] = color
+            if comments:
+                tag["comments"] = comments
+            tags.append(tag)
+        return tags
+
+    def _fetch_security_profile_groups(self):
+        groups = []
+        result = self._xpath_get("/config/devices/entry/vsys/entry/profile-group")
+        for entry in result.findall(".//entry"):
+            name = entry.get("name", "")
+            g = {"name": name}
+            for field in ("virus", "spyware", "vulnerability", "url-filtering",
+                          "file-blocking", "data-filtering", "wildfire-analysis"):
+                val = entry.findtext(field, "")
+                if val:
+                    g[field] = val
+            groups.append(g)
+        return groups
+
+    def _fetch_schedules(self):
+        schedules = []
+        result = self._xpath_get("/config/devices/entry/vsys/entry/schedule")
+        for entry in result.findall(".//entry"):
+            name = entry.get("name", "")
+            sched = {"name": name}
+            disable = entry.find("disable-override")
+            if disable is not None and disable.text == "yes":
+                sched["disable-override"] = True
+            sched_type = entry.find("schedule-type")
+            if sched_type is not None:
+                non_rec = sched_type.find("non-recurring")
+                rec = sched_type.find("recurring")
+                if non_rec is not None:
+                    sched["type"] = "non-recurring"
+                    dates = [m.text.strip() for m in non_rec.findall("member") if m.text]
+                    if dates:
+                        sched["date-time"] = dates
+                elif rec is not None:
+                    sched["type"] = "recurring"
+                    daily = rec.find("daily")
+                    weekly = rec.find("weekly")
+                    if daily is not None:
+                        sched["recurrence"] = "daily"
+                        sched["time"] = [m.text.strip() for m in daily.findall("member") if m.text]
+                    elif weekly is not None:
+                        sched["recurrence"] = "weekly"
+                        for day in ("sunday", "monday", "tuesday", "wednesday",
+                                    "thursday", "friday", "saturday"):
+                            day_el = weekly.find(day)
+                            if day_el is not None:
+                                times = [m.text.strip() for m in day_el.findall("member") if m.text]
+                                if times:
+                                    sched[day] = times
+            schedules.append(sched)
+        return schedules
+
+    def _fetch_edls(self):
+        edls = []
+        result = self._xpath_get("/config/devices/entry/vsys/entry/external-list")
+        for entry in result.findall(".//entry"):
+            name = entry.get("name", "")
+            edl = {"name": name}
+            type_el = entry.find("type")
+            if type_el is not None:
+                for t in ("ip", "domain", "url", "predefined-ip", "predefined-url"):
+                    sub = type_el.find(t)
+                    if sub is not None:
+                        edl["list-type"] = t
+                        url = sub.findtext("url", "")
+                        if url:
+                            edl["source"] = url
+                        recurring = sub.find("recurring")
+                        if recurring is not None:
+                            for r in ("five-minute", "hourly", "daily", "weekly", "monthly"):
+                                r_el = recurring.find(r)
+                                if r_el is not None:
+                                    edl["repeat"] = r
+                                    at = r_el.findtext("at", "")
+                                    if at:
+                                        edl["repeat-at"] = at
+                                    dow = r_el.findtext("day-of-week", "")
+                                    if dow:
+                                        edl["repeat-day"] = dow
+                        break
+            edls.append(edl)
+        return edls
+
+    def _fetch_custom_url_categories(self):
+        categories = []
+        result = self._xpath_get("/config/devices/entry/vsys/entry/profiles/custom-url-category")
+        for entry in result.findall(".//entry"):
+            name = entry.get("name", "")
+            cat = {"name": name}
+            members = [m.text.strip() for m in entry.findall(".//member") if m.text]
+            if members:
+                cat["members"] = members
+            desc = entry.findtext("description", "")
+            if desc:
+                cat["description"] = desc
+            categories.append(cat)
+        return categories
 
     def _fetch_address_groups(self):
         groups = []
@@ -517,10 +734,19 @@ class PaloAltoAPIClient:
         hosts, networks = self._fetch_addresses()
         groups = self._fetch_address_groups()
         services = self._fetch_services()
+        svc_groups = self._fetch_service_groups()
+        app_groups = self._fetch_application_groups()
+        tags = self._fetch_tags()
+        profile_groups = self._fetch_security_profile_groups()
+        schedules = self._fetch_schedules()
+        edls = self._fetch_edls()
+        url_categories = self._fetch_custom_url_categories()
         return {
             "hosts": hosts,
             "networks": networks,
             "groups": groups,
+            "service-groups": svc_groups,
+            "application-groups": app_groups,
             "services": services,
             "services-tcp": [s for s in services if s.get("protocol") == "tcp"],
             "services-udp": [s for s in services if s.get("protocol") == "udp"],
@@ -529,6 +755,11 @@ class PaloAltoAPIClient:
             "application-sites": [],
             "time": [],
             "users": [],
+            "tags": tags,
+            "security-profile-groups": profile_groups,
+            "schedules": schedules,
+            "edls": edls,
+            "custom-url-categories": url_categories,
         }
 
     def fetch_all(self):
@@ -547,8 +778,19 @@ class PaloAltoAPIClient:
             "objects": objects,
             "_vendor": "paloalto",
         }
-        print(f"  Security rules : {len(rules)}")
-        print(f"  NAT rules      : {len(nat_rules)}")
+        print(f"  Security rules         : {len(rules)}")
+        print(f"  NAT rules              : {len(nat_rules)}")
+        print(f"  Hosts                  : {len(objects.get('hosts', []))}")
+        print(f"  Networks               : {len(objects.get('networks', []))}")
+        print(f"  Groups                 : {len(objects.get('groups', []))}")
+        print(f"  Services               : {len(objects.get('services', []))}")
+        print(f"  Service groups         : {len(objects.get('service-groups', []))}")
+        print(f"  Application groups     : {len(objects.get('application-groups', []))}")
+        print(f"  Tags                   : {len(objects.get('tags', []))}")
+        print(f"  Security profile groups: {len(objects.get('security-profile-groups', []))}")
+        print(f"  Schedules              : {len(objects.get('schedules', []))}")
+        print(f"  EDLs                   : {len(objects.get('edls', []))}")
+        print(f"  Custom URL categories  : {len(objects.get('custom-url-categories', []))}")
         return data
 
 
@@ -639,17 +881,27 @@ class FortinetAPIClient:
         name = p.get("name", "") or p.get("policyid", str(i))
         enabled = p.get("status", "enable") == "enable"
         action = p.get("action", "deny")
-        track = "Log All" if p.get("logtraffic", "disable") == "all" else "Log"
+        logtraffic = p.get("logtraffic", "disable")
+        logstart = p.get("logtraffic-start", "disable")
+        if logstart == "enable":
+            track = "Log at Session Start"
+        elif logtraffic == "all":
+            track = "Log All"
+        elif logtraffic == "utm":
+            track = "Log UTM"
+        else:
+            track = "Log" if logtraffic == "enable" else ""
         comments = p.get("comments", "") or p.get("comment", "")
         srcintf = [z.get("name", "") for z in p.get("srcintf", []) if isinstance(z, dict)]
         dstintf = [z.get("name", "") for z in p.get("dstintf", []) if isinstance(z, dict)]
         schedule = p.get("schedule", "")
-        profile = p.get("profile-protocol-options", "") or p.get("profile_group", "")
+        profile_group = p.get("profile-group", "")
 
         sources = [m.get("name", "") for m in p.get("srcaddr", []) if isinstance(m, dict)]
         destinations = [m.get("name", "") for m in p.get("dstaddr", []) if isinstance(m, dict)]
         services = [m.get("name", "") for m in p.get("service", []) if isinstance(m, dict)]
         users = [m.get("name", "") for m in p.get("users", []) if isinstance(m, dict)]
+        groups = [m.get("name", "") for m in p.get("groups", []) if isinstance(m, dict)]
 
         extra = {}
         if srcintf:
@@ -658,12 +910,58 @@ class FortinetAPIClient:
             extra["destination-interface"] = ", ".join(dstintf)
         if schedule:
             extra["schedule"] = schedule
-        if profile:
-            extra["profile"] = [profile]
+        if profile_group:
+            extra["profile-group"] = profile_group
+
+        sec_profiles = {}
+        for sp in ["av-profile", "webfilter-profile", "ips-sensor",
+                    "application-list", "dlp-sensor", "dnsfilter-profile",
+                    "ssl-ssh-profile", "sctp-filter-profile", "file-filter-profile",
+                    "cifs-profile", "voip-profile", "waf-profile",
+                    "ssh-filter-profile", "videofilter-profile",
+                    "profile-protocol-options"]:
+            val = p.get(sp, "")
+            if val and val != "default":
+                sec_profiles[sp] = val
+        if sec_profiles:
+            extra["security-profiles"] = sec_profiles
+
+        if p.get("srcaddr-negate", "disable") == "enable":
+            extra["source-negate"] = True
+        if p.get("dstaddr-negate", "disable") == "enable":
+            extra["destination-negate"] = True
+        if p.get("service-negate", "disable") == "enable":
+            extra["service-negate"] = True
 
         nat_el = p.get("nat", "disable")
         if nat_el == "enable":
             extra["nat"] = True
+        poolname = p.get("poolname", [])
+        if isinstance(poolname, list) and any(
+            isinstance(m, dict) and m.get("name") for m in poolname
+        ):
+            extra["nat-pool"] = ", ".join(m["name"] for m in poolname if isinstance(m, dict) and m.get("name"))
+
+        shaper = p.get("traffic-shaper", "")
+        shaper_rev = p.get("traffic-shaper-reverse", "")
+        if shaper:
+            extra["traffic-shaper"] = shaper
+        if shaper_rev:
+            extra["traffic-shaper-reverse"] = shaper_rev
+
+        if p.get("send-deny-packet", "disable") == "enable":
+            extra["send-deny-packet"] = True
+        if p.get("capture-packet", "disable") == "enable":
+            extra["capture-packet"] = True
+
+        uuid = p.get("uuid", "")
+        if uuid:
+            extra["uuid"] = uuid
+
+        if users:
+            extra["users"] = [{"name": u} for u in users]
+        if groups:
+            extra["groups"] = [{"name": g} for g in groups]
 
         uid = p.get("policyid", str(i))
         return _common_rule(
@@ -678,37 +976,198 @@ class FortinetAPIClient:
         raw = self._fetch_all_pages("/api/v2/cmdb/firewall/policy")
         return [self._parse_policy(p, i + 1) for i, p in enumerate(raw)]
 
+    def _parse_proxy_policy(self, p, i):
+        name = p.get("name", "") or p.get("policyid", str(i))
+        enabled = p.get("status", "enable") == "enable"
+        action = p.get("action", "deny")
+        logtraffic = p.get("logtraffic", "disable")
+        logstart = p.get("logtraffic-start", "disable")
+        if logstart == "enable":
+            track = "Log at Session Start"
+        elif logtraffic == "all":
+            track = "Log All"
+        elif logtraffic == "utm":
+            track = "Log UTM"
+        else:
+            track = ""
+        comments = p.get("comments", "") or p.get("comment", "")
+        proxy_type = p.get("proxy", "")
+        srcintf = [z.get("name", "") for z in p.get("srcintf", []) if isinstance(z, dict)]
+        dstintf = [z.get("name", "") for z in p.get("dstintf", []) if isinstance(z, dict)]
+        schedule = p.get("schedule", "")
+        profile_group = p.get("profile-group", "")
+
+        sources = [m.get("name", "") for m in p.get("srcaddr", []) if isinstance(m, dict)]
+        destinations = [m.get("name", "") for m in p.get("dstaddr", []) if isinstance(m, dict)]
+        services = [m.get("name", "") for m in p.get("service", []) if isinstance(m, dict)]
+        users = [m.get("name", "") for m in p.get("users", []) if isinstance(m, dict)]
+        groups = [m.get("name", "") for m in p.get("groups", []) if isinstance(m, dict)]
+
+        extra = {}
+        if proxy_type:
+            extra["proxy-type"] = proxy_type
+        if srcintf:
+            extra["source-interface"] = ", ".join(srcintf)
+        if dstintf:
+            extra["destination-interface"] = ", ".join(dstintf)
+        if schedule:
+            extra["schedule"] = schedule
+        if profile_group:
+            extra["profile-group"] = profile_group
+
+        if p.get("transparent", "disable") == "enable":
+            extra["transparent"] = True
+        if p.get("webcache", "disable") == "enable":
+            extra["webcache"] = True
+        if p.get("webcache-https", "disable") == "enable":
+            extra["webcache-https"] = True
+        disclaimer = p.get("disclaimer", "disable")
+        if disclaimer != "disable":
+            extra["disclaimer"] = disclaimer
+        redirect_url = p.get("redirect-url", "")
+        if redirect_url:
+            extra["redirect-url"] = redirect_url
+        webproxy_forward = p.get("webproxy-forward-server", "")
+        if webproxy_forward:
+            extra["webproxy-forward-server"] = webproxy_forward
+        webproxy_profile = p.get("webproxy-profile", "")
+        if webproxy_profile:
+            extra["webproxy-profile"] = webproxy_profile
+        if p.get("http-tunnel-auth", "disable") == "enable":
+            extra["http-tunnel-auth"] = True
+        if p.get("ssh-policy-redirect", "disable") == "enable":
+            extra["ssh-policy-redirect"] = True
+        decrypted = p.get("decrypted-traffic-mirror", "")
+        if decrypted:
+            extra["decrypted-traffic-mirror"] = decrypted
+
+        sec_profiles = {}
+        for sp in ["av-profile", "webfilter-profile", "ips-sensor",
+                    "application-list", "dlp-sensor", "file-filter-profile",
+                    "emailfilter-profile", "icap-profile", "cifs-profile",
+                    "waf-profile", "ssh-filter-profile", "ssl-ssh-profile",
+                    "profile-protocol-options"]:
+            val = p.get(sp, "")
+            if val and val != "default":
+                sec_profiles[sp] = val
+        if sec_profiles:
+            extra["security-profiles"] = sec_profiles
+
+        if p.get("srcaddr-negate", "disable") == "enable":
+            extra["source-negate"] = True
+        if p.get("dstaddr-negate", "disable") == "enable":
+            extra["destination-negate"] = True
+        if p.get("service-negate", "disable") == "enable":
+            extra["service-negate"] = True
+
+        internet_svc = p.get("internet-service", "disable")
+        if internet_svc == "enable":
+            extra["internet-service"] = True
+            for is_key in ["internet-service-name", "internet-service-group",
+                           "internet-service-custom", "internet-service-custom-group"]:
+                val = p.get(is_key, [])
+                if isinstance(val, list):
+                    names = [m.get("name", "") for m in val if isinstance(m, dict) and m.get("name")]
+                    if names:
+                        extra[is_key] = ", ".join(names)
+
+        if users:
+            extra["users"] = [{"name": u} for u in users]
+        if groups:
+            extra["groups"] = [{"name": g} for g in groups]
+
+        uuid = p.get("uuid", "")
+        if uuid:
+            extra["uuid"] = uuid
+        if p.get("utm-status", "disable") == "enable":
+            extra["utm-status"] = True
+
+        uid = p.get("policyid", str(i))
+        rule = _common_rule(
+            uid, name, f"fg-proxy-{i:04d}", enabled,
+            sources or ["Any"], destinations or ["Any"], services or ["Any"],
+            action.capitalize(), track, comments,
+            install_on=None, extra=extra,
+        )
+        rule["proxy-type"] = proxy_type
+        return rule
+
+    def fetch_proxy_policies(self):
+        print("  Fetching proxy policies ...")
+        try:
+            raw = self._fetch_all_pages("/api/v2/cmdb/firewall/proxy-policy")
+            return [self._parse_proxy_policy(p, i + 1) for i, p in enumerate(raw)]
+        except Exception as e:
+            print(f"  Warning: proxy policies not available ({e})")
+            return []
+
     def fetch_nat_rules(self):
         print("  Fetching NAT policies ...")
+        nat_rules = []
         try:
             raw = self._fetch_all_pages("/api/v2/cmdb/firewall/central-snat-map")
-            nat_rules = []
             for i, p in enumerate(raw, 1):
-                name = p.get("name", f"nat-{i:04d}")
+                name = p.get("name", f"central-snat-{i:04d}")
                 enabled = p.get("status", "enable") == "enable"
+                nat_type = p.get("type", "")
                 src = [m.get("name", "") for m in p.get("srcaddr", []) if isinstance(m, dict)]
                 dst = [m.get("name", "") for m in p.get("dstaddr", []) if isinstance(m, dict)]
+                service = [m.get("name", "") for m in p.get("service", []) if isinstance(m, dict)]
                 orig_src = [m.get("name", "") for m in p.get("srcaddr", []) if isinstance(m, dict)]
                 nat_rules.append({
                     "rule-number": str(i),
                     "name": name,
                     "uid": p.get("policyid", f"fg-nat-{i:04d}"),
                     "enabled": enabled,
-                    "method": "dynamic-ip-and-port",
+                    "method": nat_type or "dynamic-ip-and-port",
                     "original-source": [{"name": s} for s in (orig_src or ["Any"])],
                     "original-destination": [{"name": d} for d in (dst or ["Any"])],
-                    "original-service": [{"name": "Any"}],
+                    "original-service": [{"name": s} for s in (service or ["Any"])],
                     "translated-source": [{"name": s} for s in src or ["Original"]],
                     "translated-destination": [{"name": "Original"}],
                     "translated-service": [{"name": "Original"}],
                     "action": {"name": "snat"},
                     "install-on": {"name": ""},
-                    "comments": "",
+                    "comments": p.get("comments", "") or p.get("comment", ""),
                 })
-            return nat_rules
         except Exception as e:
-            print(f"  Warning: NAT rules not available ({e})")
-            return []
+            print(f"  Warning: Central SNAT not available ({e})")
+
+        try:
+            vip_raw = self._fetch_all_pages("/api/v2/cmdb/firewall/vip")
+            offset = len(nat_rules)
+            for i, v in enumerate(vip_raw, offset + 1):
+                name = v.get("name", f"vip-{i:04d}")
+                enabled = v.get("status", "enable") == "enable"
+                mappedip = v.get("mappedip", [])
+                if isinstance(mappedip, list) and mappedip:
+                    dst = mappedip[0].get("range", "") if isinstance(mappedip[0], dict) else str(mappedip[0])
+                else:
+                    dst = ""
+                extip = v.get("extip", "")
+                port_fwd = v.get("portforward", "") == "enable"
+                extport = v.get("extport", "") if port_fwd else ""
+                mappedport = v.get("mappedport", "") if port_fwd else ""
+                proto = v.get("protocol", "")
+                nat_rules.append({
+                    "rule-number": str(i),
+                    "name": name,
+                    "uid": f"fg-vip-{i:04d}",
+                    "enabled": enabled,
+                    "method": "static-nat",
+                    "original-source": [{"name": "Any"}],
+                    "original-destination": [{"name": extip}] if extip else [{"name": "Any"}],
+                    "original-service": [{"name": extport}] if extport else [{"name": "Any"}],
+                    "translated-source": [{"name": "Original"}],
+                    "translated-destination": [{"name": dst}] if dst else [{"name": "Original"}],
+                    "translated-service": [{"name": mappedport}] if mappedport else [{"name": "Original"}],
+                    "action": {"name": "dnat"},
+                    "install-on": {"name": ""},
+                    "comments": v.get("comment", "") or v.get("comments", ""),
+                })
+        except Exception as e:
+            print(f"  Warning: VIPs not available for NAT ({e})")
+        return nat_rules
 
     def _fetch_addresses(self):
         hosts = []
@@ -772,15 +1231,144 @@ class FortinetAPIClient:
             print(f"  Warning: services not available ({e})")
         return services
 
+    def _fetch_service_groups(self):
+        groups = []
+        try:
+            items = self._fetch_all_pages("/api/v2/cmdb/firewall.service/group")
+            for g in items:
+                name = g.get("name", "")
+                members = []
+                for m in g.get("member", []):
+                    if isinstance(m, dict) and m.get("name"):
+                        members.append({"name": m["name"]})
+                if members:
+                    groups.append({"name": name, "members": members})
+        except Exception as e:
+            print(f"  Warning: service groups not available ({e})")
+        return groups
+
+    def _fetch_schedules(self):
+        schedules = []
+        for path, stype in [
+            ("/api/v2/cmdb/firewall.schedule/recurring", "recurring"),
+            ("/api/v2/cmdb/firewall.schedule/onetime", "onetime"),
+            ("/api/v2/cmdb/firewall.schedule/group", "group"),
+        ]:
+            try:
+                items = self._fetch_all_pages(path)
+                for s in items:
+                    name = s.get("name", "")
+                    entry = {"name": name, "type": stype}
+                    if stype == "recurring":
+                        entry.update({
+                            "day": s.get("day", ""),
+                            "start": s.get("start", ""),
+                            "end": s.get("end", ""),
+                        })
+                    elif stype == "onetime":
+                        entry.update({
+                            "start": s.get("start", ""),
+                            "end": s.get("end", ""),
+                        })
+                    elif stype == "group":
+                        members = []
+                        for m in s.get("member", []):
+                            if isinstance(m, dict) and m.get("name"):
+                                members.append({"name": m["name"]})
+                        entry["members"] = members
+                    schedules.append(entry)
+            except Exception as e:
+                print(f"  Warning: schedules ({stype}) not available ({e})")
+        return schedules
+
+    def _fetch_vips(self):
+        vips = []
+        try:
+            items = self._fetch_all_pages("/api/v2/cmdb/firewall/vip")
+            for v in items:
+                name = v.get("name", "")
+                entry = {"name": name}
+                mappedip = v.get("mappedip", [])
+                if isinstance(mappedip, list) and len(mappedip) > 0:
+                    entry["mapped-ip"] = mappedip[0].get("range", "") if isinstance(mappedip[0], dict) else str(mappedip[0])
+                extip = v.get("extip", "")
+                if extip:
+                    entry["ext-ip"] = extip
+                port_fwd = v.get("portforward", "")
+                if port_fwd == "enable":
+                    entry["port-forward"] = True
+                    entry["extport"] = v.get("extport", "")
+                    entry["mappedport"] = v.get("mappedport", "")
+                vips.append(entry)
+        except Exception as e:
+            print(f"  Warning: VIPs not available ({e})")
+        return vips
+
+    def _fetch_ippools(self):
+        pools = []
+        try:
+            items = self._fetch_all_pages("/api/v2/cmdb/firewall/ippool")
+            for p in items:
+                name = p.get("name", "")
+                entry = {"name": name}
+                startip = p.get("startip", "")
+                endip = p.get("endip", "")
+                if startip:
+                    entry["start-ip"] = startip
+                if endip:
+                    entry["end-ip"] = endip
+                pools.append(entry)
+        except Exception as e:
+            print(f"  Warning: IP pools not available ({e})")
+        return pools
+
+    def _fetch_profile_groups(self):
+        groups = []
+        try:
+            items = self._fetch_all_pages("/api/v2/cmdb/firewall/profile-group")
+            for g in items:
+                name = g.get("name", "")
+                groups.append({
+                    "name": name,
+                    "av-profile": g.get("av-profile", ""),
+                    "webfilter-profile": g.get("webfilter-profile", ""),
+                    "ips-sensor": g.get("ips-sensor", ""),
+                    "application-list": g.get("application-list", ""),
+                    "dlp-sensor": g.get("dlp-sensor", ""),
+                    "dnsfilter-profile": g.get("dnsfilter-profile", ""),
+                    "ssl-ssh-profile": g.get("ssl-ssh-profile", ""),
+                })
+        except Exception as e:
+            print(f"  Warning: profile groups not available ({e})")
+        return groups
+
+    def _fetch_tags(self):
+        tags = []
+        try:
+            items = self._fetch_all_pages("/api/v2/cmdb/system/object-tagging")
+            for t in items:
+                name = t.get("name", "")
+                tags.append({"name": name})
+        except Exception as e:
+            print(f"  Warning: tags not available ({e})")
+        return tags
+
     def fetch_all_objects(self):
         print("  Fetching objects ...")
         hosts, networks = self._fetch_addresses()
         groups = self._fetch_addr_groups()
         services = self._fetch_services()
+        svc_groups = self._fetch_service_groups()
+        schedules = self._fetch_schedules()
+        vips = self._fetch_vips()
+        ippools = self._fetch_ippools()
+        profile_groups = self._fetch_profile_groups()
+        tags = self._fetch_tags()
         return {
             "hosts": hosts,
             "networks": networks,
             "groups": groups,
+            "service-groups": svc_groups,
             "services": services,
             "services-tcp": [s for s in services if s.get("protocol") == "tcp"],
             "services-udp": [s for s in services if s.get("protocol") == "udp"],
@@ -789,10 +1377,16 @@ class FortinetAPIClient:
             "application-sites": [],
             "time": [],
             "users": [],
+            "schedules": schedules,
+            "vips": vips,
+            "ip-pools": ippools,
+            "security-profile-groups": profile_groups,
+            "tags": tags,
         }
 
     def fetch_all(self):
         rules = self.fetch_policies()
+        proxy_rules = self.fetch_proxy_policies()
         nat_rules = self.fetch_nat_rules()
         objects = self.fetch_all_objects()
 
@@ -802,13 +1396,26 @@ class FortinetAPIClient:
             "rules": rules,
             "inline-layers": [],
         }
+        pkg = _common_package("fetched_policy", [layer], nat_rules)
+        pkg["proxy-policy"] = {"rules": proxy_rules}
         data = {
-            "policy-package": _common_package("fetched_policy", [layer], nat_rules),
+            "policy-package": pkg,
             "objects": objects,
             "_vendor": "fortinet",
         }
-        print(f"  Firewall rules : {len(rules)}")
-        print(f"  NAT rules      : {len(nat_rules)}")
+        print(f"  Firewall rules          : {len(rules)}")
+        print(f"  Proxy rules             : {len(proxy_rules)}")
+        print(f"  NAT rules               : {len(nat_rules)}")
+        print(f"  Hosts                   : {len(objects.get('hosts', []))}")
+        print(f"  Networks                : {len(objects.get('networks', []))}")
+        print(f"  Groups                  : {len(objects.get('groups', []))}")
+        print(f"  Services                : {len(objects.get('services', []))}")
+        print(f"  Service groups          : {len(objects.get('service-groups', []))}")
+        print(f"  Schedules               : {len(objects.get('schedules', []))}")
+        print(f"  VIPs                    : {len(objects.get('vips', []))}")
+        print(f"  IP pools                : {len(objects.get('ip-pools', []))}")
+        print(f"  Profile groups          : {len(objects.get('security-profile-groups', []))}")
+        print(f"  Tags                    : {len(objects.get('tags', []))}")
         return data
 
 

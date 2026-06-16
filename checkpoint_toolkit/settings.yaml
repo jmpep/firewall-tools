@@ -3,5 +3,12 @@
   "page_size": 200,
   "download_dir": "examples",
   "log_level": "INFO",
+  "last_server": "",
+  "last_username": "",
+  "last_port": 443,
+  "last_vendor": "auto",
+  "last_verify_ssl": false,
+  "last_policy_name": "fetched_policy",
+  "last_output_dir": "examples",
   "language": "en"
 }
