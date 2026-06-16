@@ -16,7 +16,7 @@ try:
 except ImportError:
     HAS_FETCH = False
 
-from utils import load_settings, save_settings, setup_logging, reset_log, DEFAULT_LOG_LEVEL
+from utils import load_settings, save_settings, update_settings, setup_logging, reset_log, DEFAULT_LOG_LEVEL
 from lang import L, set_language
 
 logger = logging.getLogger(__name__)
@@ -406,7 +406,6 @@ class SearchGUI:
                     pass
             self._lang_btns[code] = btn
         self._highlight_lang(L.code)
-        self._lang_init_code = None  # avoid redundant save on startup
 
         # ---- banner
         banner = tk.Frame(root, bg="#1a3a5c", height=56)
@@ -459,6 +458,14 @@ class SearchGUI:
         nat_frame = ttk.Frame(self.nb)
         self.nb.add(nat_frame, text=L("tab.nat"))
         self._build_nat_tab(nat_frame)
+
+        # ---- status bar
+        status_frame = ttk.Frame(root)
+        status_frame.pack(fill=tk.X, padx=5, pady=(0, 3))
+        self.status_label = ttk.Label(status_frame, text="", relief=tk.SUNKEN, anchor=tk.W)
+        self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.progress_bar = ttk.Progressbar(status_frame, mode='indeterminate', length=120)
+        self.progress_bar.pack(side=tk.RIGHT, padx=5)
 
         # -- load file if given
         if initial_file and os.path.exists(initial_file):
@@ -880,6 +887,21 @@ class SearchGUI:
         msg = json.dumps(vals, indent=2, ensure_ascii=False)
         messagebox.showinfo(L("detail.nat"), msg)
 
+    # ============================================================ status / progress
+
+    def _set_status(self, text):
+        self.status_label.config(text=text)
+        self.root.update_idletasks()
+
+    def _show_progress(self, visible=True):
+        if visible:
+            self.progress_bar.pack(side=tk.RIGHT, padx=5)
+            self.progress_bar.start(10)
+        else:
+            self.progress_bar.stop()
+            self.progress_bar.pack_forget()
+        self.root.update_idletasks()
+
     # ============================================================ language
 
     def _highlight_lang(self, code):
@@ -889,12 +911,12 @@ class SearchGUI:
     def _select_language(self, code):
         if not self.root.winfo_exists():
             return
-        if code == L.code and self._lang_init_code is None:
+        if code == L.code:
             return
         set_language(code)
         self._highlight_lang(code)
         self._apply_language()
-        save_settings({"language": code})
+        update_settings({"language": code})
 
     def _apply_language(self):
         def _u(w, key=None, **kwargs):
@@ -938,7 +960,7 @@ class SearchGUI:
     # ============================================================ quit / persist
 
     def _on_quit(self):
-        save_settings({
+        update_settings({
             "timeout": self.timeout,
             "page_size": self.page_size,
             "download_dir": self.download_dir,
@@ -954,7 +976,7 @@ class SearchGUI:
     def _settings_dialog(self):
         dlg = tk.Toplevel(self.root)
         dlg.title(L("settings.title"))
-        dlg.geometry("400x360")
+        dlg.geometry("480x380")
         dlg.transient(self.root)
         dlg.grab_set()
         dlg.resizable(False, False)
@@ -982,12 +1004,12 @@ class SearchGUI:
         lvl_var = tk.StringVar(value=self.log_level_name)
         lvl_combo = ttk.Combobox(lf, textvariable=lvl_var,
                                   values=["DEBUG", "INFO", "WARNING", "ERROR"],
-                                  state="readonly", width=12)
+                                  state="readonly", width=16)
         lvl_combo.grid(row=0, column=1, sticky=tk.W, padx=8, pady=4)
 
         ttk.Label(lf, text=L("settings.download_dir")).grid(row=1, column=0, sticky=tk.W, pady=4)
         dd_var = tk.StringVar(value=self.download_dir)
-        ttk.Entry(lf, textvariable=dd_var, width=30).grid(row=1, column=1, padx=8, pady=4, sticky=tk.EW)
+        ttk.Entry(lf, textvariable=dd_var, width=50).grid(row=1, column=1, padx=8, pady=4, sticky=tk.EW)
         lf.columnconfigure(1, weight=1)
 
         reset_log_btn = ttk.Button(lf, text=L("settings.reset_log"))
@@ -1015,7 +1037,7 @@ class SearchGUI:
                 "log_level": self.log_level_name,
                 "language": L.code,
             }
-            save_settings(settings)
+            update_settings(settings)
             dlg.destroy()
 
         bf = ttk.Frame(dlg)
@@ -1130,7 +1152,7 @@ class SearchGUI:
         _client_ref = [None]
 
         def _save_last_connection():
-            save_settings({
+            update_settings({
                 "last_server": server_var.get().strip(),
                 "last_username": user_var.get().strip(),
                 "last_port": int(port_var.get().strip() or 443),
@@ -1376,9 +1398,12 @@ class SearchGUI:
             self._load(path)
 
     def _load(self, path):
+        self._show_progress(True)
+        self._set_status(os.path.basename(path))
         try:
             self.data = load_policy(path)
         except Exception as e:
+            self._show_progress(False)
             messagebox.showerror(L("export.error"), L("open.load_error", e=e))
             return
 
@@ -1392,6 +1417,8 @@ class SearchGUI:
         self._do_obj_search()
         self._do_rule_search()
         self._do_nat_search()
+        self._show_progress(False)
+        self._set_status("")
 
     # ============================================================ sort
 

@@ -40,13 +40,20 @@ def load_settings():
 
 
 def save_settings(settings):
-    """Save settings to the YAML file."""
+    """Save settings to the YAML file (overwrites all keys)."""
     out_dir = os.path.dirname(SETTINGS_PATH)
     if out_dir and not os.path.exists(out_dir):
         os.makedirs(out_dir, exist_ok=True)
     with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=2)
     return True
+
+
+def update_settings(partial):
+    """Load existing settings, merge `partial` on top, save back."""
+    current = load_settings()
+    current.update(partial)
+    return save_settings(current)
 
 
 def _log_level_name(level_int):

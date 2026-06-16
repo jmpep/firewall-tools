@@ -28,11 +28,11 @@ T = {
         "sk": "Vyh\u013ead\u00e1vanie Pravidiel Firewallu",
     },
     "app.title_file": {
-        "en": "Firewall Policy Search \u2014 {}",
-        "fr": "Recherche de Politique \u2014 {}",
-        "de": "Firewall-Richtliniensuche \u2014 {}",
-        "it": "Ricerca Politiche \u2014 {}",
-        "sk": "Vyh\u013ead\u00e1vanie Pravidiel \u2014 {}",
+        "en": "Firewall Policy Search \u2014 {name}",
+        "fr": "Recherche de Politique \u2014 {name}",
+        "de": "Firewall-Richtliniensuche \u2014 {name}",
+        "it": "Ricerca Politiche \u2014 {name}",
+        "sk": "Vyh\u013ead\u00e1vanie Pravidiel \u2014 {name}",
     },
 
     # ── menu ──
