@@ -124,7 +124,7 @@ class CheckpointAPIClient:
     """Client for Checkpoint R81.x Management Web API (no external deps)."""
 
     def __init__(self, server, username, password, port=443, verify=False, timeout=300, page_size=200):
-        self.base_url = f"https://{server}:{port}"
+        self.base_url = f"https://{server}:{port}/web_api"
         self.verify = verify
         self.timeout = timeout
         self.page_size = page_size
@@ -183,9 +183,9 @@ class CheckpointAPIClient:
             if total is not None:
                 if payload["offset"] + len(items) >= total:
                     break
-            elif len(items) < limit:
+            elif len(items) < payload["limit"]:
                 break
-            payload["offset"] += limit
+            payload["offset"] += payload["limit"]
         return all_data
 
     # ------------------------------------------------------------------ layers & rules
