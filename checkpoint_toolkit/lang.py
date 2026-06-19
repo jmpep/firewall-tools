@@ -19,22 +19,20 @@ LANG_CODES = {"en", "fr", "de", "it", "sk"}
 
 T = {
 
-    # ── global / top-level ──
-    "app.title": {
-        "en": "Firewall Policy Search",
-        "fr": "Recherche de Politique Pare-feu",
-        "de": "Firewall-Richtliniensuche",
-        "it": "Ricerca Politiche Firewall",
-        "sk": "Vyh\u013ead\u00e1vanie Pravidiel Firewallu",
-    },
-    "app.title_file": {
-        "en": "Firewall Policy Search \u2014 {name}",
-        "fr": "Recherche de Politique \u2014 {name}",
-        "de": "Firewall-Richtliniensuche \u2014 {name}",
-        "it": "Ricerca Politiche \u2014 {name}",
-        "sk": "Vyh\u013ead\u00e1vanie Pravidiel \u2014 {name}",
-    },
-
+    "app.title": {
+        "en": "Firewall Policy Search",
+        "fr": "Recherche police",
+        "de": "Firewall-policy",
+        "it": "Ricerca Police Firewall",
+        "sk": "Vyh\u013ead\u00e1vanie police Firewallu",
+    },
+    "app.title_file": {
+        "en": "Firewall Policy Search \u2014 {name}",
+        "fr": "Recherche de Police \u2014 {name}",
+        "de": "Firewall-Policy suche \u2014 {name}",
+        "it": "Ricerca Police firewall \u2014 {name}",
+        "sk": "Vyh\u013ead\u00e1vanie Police \u2014 {name}",
+    },
     # ── menu ──
     "menu.file": {"en": "File", "fr": "Fichier", "de": "Datei", "it": "File", "sk": "S\u00fabor"},
     "menu.open": {"en": "Open JSON \u2026", "fr": "Ouvrir JSON \u2026", "de": "JSON \u00f6ffnen \u2026",
