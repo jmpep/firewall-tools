@@ -18,14 +18,13 @@ LANG_CODES = {"en", "fr", "de", "it", "sk"}
 # Keys are dotted paths matching the GUI context.
 
 T = {
-
-    "app.title": {
-        "en": "Firewall Policy Search",
-        "fr": "Recherche police",
-        "de": "Firewall-policy",
-        "it": "Ricerca Police Firewall",
-        "sk": "Vyh\u013ead\u00e1vanie police Firewallu",
-    },
+    "app.title": {
+        "en": "Firewall Policy Search",
+        "fr": "Recherche police",
+        "de": "Firewall-policy",
+        "it": "Ricerca Police Firewall",
+        "sk": "Vyh\u013ead\u00e1vanie police Firewallu",
+    },
     "app.title_file": {
         "en": "Firewall Policy Search \u2014 {name}",
         "fr": "Recherche de Police \u2014 {name}",
