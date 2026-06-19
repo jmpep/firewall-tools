@@ -42,19 +42,19 @@ T = {
     # ── toolbar ──
     "tb.file_label": {"en": "File:", "fr": "Fichier :", "de": "Datei:", "it": "File:", "sk": "S\u00fabor:"},
     "tb.open": {"en": "Open", "fr": "Ouvrir", "de": "\u00d6ffnen", "it": "Apri", "sk": "Otvori\u0165"},
-    "tb.download": {"en": "Download Policy from Firewall", "fr": "T\u00e9l\u00e9charger la politique",
-                    "de": "Richtlinie herunterladen", "it": "Scarica policy dal firewall",
+    "tb.download": {"en": "Download Policy from Firewall", "fr": "T\u00e9l\u00e9charger les polices pare-feux",
+                    "de": "Firewalls'policies herunterladen", "it": "Scarica policy dal firewall",
                     "sk": "Stiahnu\u0165 pravidl\u00e1 z firewallu"},
     "tb.settings": {"en": "\u2699 Settings", "fr": "\u2699 Param\u00e8tres", "de": "\u2699 Einstellungen",
                     "it": "\u2699 Impostazioni", "sk": "\u2699 Nastavenia"},
     "tb.lang": {"en": "Lang:", "fr": "Langue :", "de": "Sprache:", "it": "Lingua:", "sk": "Jazyk:"},
 
     # ── banner ──
-    "banner.title": {"en": "Firewall Policy Toolkit  \u2014  Checkpoint / Fortinet / Palo Alto",
-                     "fr": "Kit de Politique Pare-feu  \u2014  Checkpoint / Fortinet / Palo Alto",
-                     "de": "Firewall-Richtlinien-Toolkit  \u2014  Checkpoint / Fortinet / Palo Alto",
-                     "it": "Toolkit Politiche Firewall  \u2014  Checkpoint / Fortinet / Palo Alto",
-                     "sk": "N\u00e1stroje pre Pravidl\u00e1 Firewallu  \u2014  Checkpoint / Fortinet / Palo Alto"},
+    "banner.title": {"en": "Firewall Policy Toolkit  \u2014  Checkpoint / Fortinet / Palo Alto",
+                     "fr": "Kit de police Pare-feu  \u2014  Checkpoint / Fortinet / Palo Alto",
+                     "de": "Firewall-police-Toolkit  \u2014  Checkpoint / Fortinet / Palo Alto",
+                     "it": "Toolkit police Firewall  \u2014  Checkpoint / Fortinet / Palo Alto",
+                     "sk": "N\u00e1stroje pre Pravidl\u00e1 Firewallu  \u2014  Checkpoint / Fortinet / Palo Alto"},
     "banner.subtitle": {
         "en": "v13  \u2022  5000+ objects  \u2022  1000+ rules  \u2022  enjoy and give me feedback.  Jean-Michel. Code under https://github.com/jmpep/firewall-tools",
         "fr": "v13  \u2022  5000+ objets  \u2022  1000+ r\u00e8gles  \u2022  profitez et donnez votre avis.  Jean-Michel. Code under https://github.com/jmpep/firewall-tools",
@@ -68,7 +68,7 @@ T = {
     "tab.rules": {"en": "Rules", "fr": "R\u00e8gles", "de": "Regeln", "it": "Regole", "sk": "Pravidl\u00e1"},
     "tab.nat": {"en": "NAT Rules", "fr": "R\u00e8gles NAT", "de": "NAT-Regeln", "it": "Regole NAT",
                 "sk": "NAT pravidl\u00e1"},
-    "tab.proxy": {"en": "Proxy Policies", "fr": "R\u00e8gles proxy", "de": "Proxy-Richtlinien",
+    "tab.proxy": {"en": "Proxy Policies", "fr": "R\u00e8gles proxy", "de": "Proxy-Police",
                   "it": "Regole proxy", "sk": "Proxy pravidl\u00e1"},
 
     # ── search ──
@@ -102,7 +102,7 @@ T = {
                          "de": "{n} NAT-Regeln", "it": "{n} regole NAT",
                          "sk": "{n} NAT pravidiel"},
     "search.count_proxy": {"en": "{n} proxy policies", "fr": "{n} r\u00e8gles proxy",
-                           "de": "{n} Proxy-Richtlinien", "it": "{n} regole proxy",
+                           "de": "{n} Proxy-Polices", "it": "{n} regole proxy",
                            "sk": "{n} proxy pravidiel"},
 
     # ── split options ──
@@ -131,7 +131,7 @@ T = {
     "export.title": {"en": "Export to CSV", "fr": "Exporter en CSV", "de": "Als CSV exportieren",
                      "it": "Esporta in CSV", "sk": "Exportova\u0165 do CSV"},
     "export.filter_json": {"en": "JSON policy files (*.json)", "fr": "Fichiers JSON (*.json)",
-                           "de": "JSON-Richtliniendateien (*.json)", "it": "File policy JSON (*.json)",
+                           "de": "JSON-Policy (*.json)", "it": "File policy JSON (*.json)",
                            "sk": "JSON s\u00fabory pravidiel (*.json)"},
     "export.filter_csv": {"en": "CSV files (*.csv)", "fr": "Fichiers CSV (*.csv)",
                           "de": "CSV-Dateien (*.csv)", "it": "File CSV (*.csv)",
@@ -148,7 +148,7 @@ T = {
     "detail.nat": {"en": "NAT rule detail", "fr": "D\u00e9tail r\u00e8gle NAT", "de": "NAT-Regeldetail",
                    "it": "Dettaglio regola NAT", "sk": "Podrobnosti NAT pravidla"},
     "detail.proxy": {"en": "Proxy policy detail", "fr": "D\u00e9tail r\u00e8gle proxy",
-                     "de": "Proxy-Richtlinien-Detail", "it": "Dettaglio regola proxy",
+                     "de": "Proxy-Police-Detail", "it": "Dettaglio regola proxy",
                      "sk": "Podrobnosti proxy pravidla"},
     "detail.object": {"en": "Object detail", "fr": "D\u00e9tail de l'objet", "de": "Objektdetails",
                       "it": "Dettaglio oggetto", "sk": "Podrobnosti objektu"},
@@ -192,7 +192,7 @@ T = {
 
     # ── download dialog ──
     "dlg.title": {"en": "Download Policy from Firewall", "fr": "T\u00e9l\u00e9charger la politique",
-                  "de": "Richtlinie herunterladen", "it": "Scarica policy dal firewall",
+                  "de": "Policy herunterladen", "it": "Scarica policy dal firewall",
                   "sk": "Stiahnu\u0165 pravidl\u00e1 z firewallu"},
     "dlg.connection": {"en": "Connection", "fr": "Connexion", "de": "Verbindung",
                        "it": "Connessione", "sk": "Pripojenie"},
@@ -224,7 +224,7 @@ T = {
                        "it": "Seleziona tutto", "sk": "Vybra\u0165 v\u0161etko"},
     "dlg.clear_all": {"en": "Clear All", "fr": "Tout d\u00e9s\u00e9lectionner", "de": "Alle abw\u00e4hlen",
                       "it": "Deseleziona tutto", "sk": "Zru\u0161i\u0165 v\u0161etko"},
-    "dlg.policy_name": {"en": "Policy name:", "fr": "Nom de la politique :", "de": "Richtlinienname:",
+    "dlg.policy_name": {"en": "Policy name:", "fr": "Nom de la politique :", "de": "Policynname:",
                         "it": "Nome policy:", "sk": "N\u00e1zov pravidiel:"},
     "dlg.download_btn": {"en": "Download && Load", "fr": "T\u00e9l\u00e9charger && Charger",
                          "de": "Herunterladen && Laden", "it": "Scarica && Carica",
@@ -256,8 +256,8 @@ T = {
         "sk": "Pripojen\u00e9. N\u00e1jden\u00fdch {count} vrstiev. Vyberte a stiahnite.",
     },
     "dlg.need_layer": {"en": "Select at least one layer or specify a policy name.",
-                       "fr": "S\u00e9lectionnez au moins une couche ou un nom de politique.",
-                       "de": "W\u00e4hlen Sie mindestens eine Ebene oder einen Richtliniennamen.",
+                       "fr": "S\u00e9lectionnez au moins une policy ou un nom de police.",
+                       "de": "W\u00e4hlen Sie mindestens eine Ebene oder einen Policynamen.",
                        "it": "Seleziona almeno un layer o specifica un nome policy.",
                        "sk": "Vyberte aspo\u0148 jednu vrstvu alebo zadajte n\u00e1zov pravidiel."},
     "dlg.fetch_rules": {"en": "Fetching rulebases \u2026", "fr": "R\u00e9cup\u00e9ration des r\u00e8gles \u2026",
@@ -289,7 +289,7 @@ T = {
     "dlg.saving": {"en": "Saving \u2026", "fr": "Enregistrement \u2026", "de": "Speichern \u2026",
                    "it": "Salvataggio \u2026", "sk": "Uklad\u00e1m \u2026"},
     "dlg.save_title": {"en": "Save policy as", "fr": "Enregistrer la politique sous",
-                       "de": "Richtlinie speichern unter", "it": "Salva policy come",
+                       "de": "Policy speichern unter", "it": "Salva policy come",
                        "sk": "Ulo\u017ei\u0165 pravidl\u00e1 ako"},
     "dlg.save_cancelled": {"en": "Save cancelled.", "fr": "Enregistrement annul\u00e9.",
                            "de": "Speichern abgebrochen.", "it": "Salvataggio annullato.",
@@ -325,7 +325,7 @@ T = {
 
     # ── open file ──
     "open.title": {"en": "Open Checkpoint policy JSON", "fr": "Ouvrir une politique JSON",
-                   "de": "Checkpoint-Richtlinien-JSON \u00f6ffnen",
+                   "de": "Checkpoint-Policy-JSON \u00f6ffnen",
                    "it": "Apri policy JSON Checkpoint", "sk": "Otvori\u0165 JSON pravidiel"},
     "open.load_error": {"en": "Failed to load:\n{e}", "fr": "\u00c9chec de chargement :\n{e}",
                         "de": "Laden fehlgeschlagen:\n{e}", "it": "Caricamento fallito:\n{e}",
