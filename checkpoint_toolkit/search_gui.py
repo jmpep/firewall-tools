@@ -54,7 +54,7 @@ def _resolve_ip(objects_lookup, name):
     entry = objects_lookup.get(name)
     if not entry:
         return None
-    ip = entry.get('ip-address', '')
+    ip = entry.get('ip-address') or entry.get('ipv4-address', '')
     if ip:
         return f"{ip}/32"
     subnet = entry.get('subnet', '')
@@ -211,9 +211,9 @@ def flatten_rule_for_display(layer, rule, lookup):
     action = rule.get('action', {})
     if isinstance(action, dict):
         action = action.get('name', '')
-    track = rule.get('track', {})
+    track = rule.get('track', '')
     if isinstance(track, dict):
-        track = track.get('type', '')
+        track = track.get('type', '') or ''
 
     meta = rule.get('meta-info', {}) or {}
     hm = rule.get('hits', {}) or {}
@@ -238,7 +238,6 @@ def flatten_rule_for_display(layer, rule, lookup):
         "action": action,
         "track": track,
         "comments": rule.get('comments', ''),
-        "uid": uid,
         "hits": hm.get('hits', '') if isinstance(hm, dict) else '',
         "creation-time": meta.get('creation-time', {}).get('iso', '') if isinstance(meta.get('creation-time'), dict) else '',
         "last-modified": meta.get('last-modified', {}).get('iso', '') if isinstance(meta.get('last-modified'), dict) else '',
@@ -294,7 +293,6 @@ def flatten_nat_for_display(rule, lookup):
         "action": action,
         "install-on": install,
         "comments": rule.get('comments', ''),
-        "uid": uid,
         "hits": hm.get('hits', '') if isinstance(hm, dict) else '',
         "creation-time": meta.get('creation-time', {}).get('iso', '') if isinstance(meta.get('creation-time'), dict) else '',
         "last-modified": meta.get('last-modified', {}).get('iso', '') if isinstance(meta.get('last-modified'), dict) else '',
@@ -358,7 +356,6 @@ def flatten_proxy_for_display(rule, lookup):
         "profile-group": extra.get('profile-group', ''),
         "comments": rule.get('comments', ''),
         "track": rule.get('track', ''),
-        "uid": uid,
     }
 
 
@@ -387,20 +384,20 @@ class SearchGUI:
                 "translated-destination", "translated-destination-ips",
                 "translated-service", "translated-service-ports",
                 "method", "action", "install-on", "comments",
-                "uid", "hits", "creation-time", "last-modified")
+                "hits", "creation-time", "last-modified")
     PROXY_COLS = ("rule-number", "rule-id", "name", "status", "proxy-type",
                   "source", "destination", "service",
                   "source-interface", "destination-interface",
                   "action", "schedule",
                   "transparent", "webcache", "disclaimer",
                   "redirect-url", "webproxy-profile", "http-tunnel-auth",
-                  "profile-group", "comments", "track", "uid")
+                   "profile-group", "comments", "track")
     RULE_COLS = ("layer", "rule-number", "rule-id", "name", "status",
                  "source", "source-ips",
                  "destination", "destination-ips",
                  "service", "service-ports",
-                 "action", "track", "comments",
-                 "uid", "hits", "creation-time", "last-modified")
+                  "action", "track", "comments",
+                  "hits", "creation-time", "last-modified")
     OBJ_COLS = ("name", "ip-address", "subnet", "mask-length", "type",
                 "comments", "category", "risk", "_objtype")
 
@@ -607,11 +604,23 @@ class SearchGUI:
         self.obj_count_label.config(text=L("search.count_matched", n=len(matched), total=len(self.all_objects)))
 
     def _obj_vals(self, o):
-        return tuple(o.get(c, '') for c in self.OBJ_COLS)
+        def _fmt(v):
+            if isinstance(v, dict):
+                return v.get('name', '') or str(v)
+            if isinstance(v, (int, float)):
+                return str(v)
+            return v if v else ''
+        return tuple(_fmt(o.get(c)) for c in self.OBJ_COLS)
 
     def _obj_matches(self, o, term):
-        fields = [str(o.get(k, '')) for k in ('name', 'ip-address', 'subnet', 'comments',
-                                               'category', '_objtype')]
+        def _fmt(v):
+            if isinstance(v, dict):
+                return v.get('name', '') or str(v)
+            if isinstance(v, (int, float)):
+                return str(v)
+            return v if v else ''
+        fields = [_fmt(o.get(k)) for k in ('name', 'ip-address', 'subnet', 'comments',
+                                            'category', '_objtype')]
         return any(match_pattern(f, term) for f in fields)
 
     def _obj_detail(self, event):
@@ -1259,15 +1268,21 @@ class SearchGUI:
         dlg.transient(self.root)
         dlg.grab_set()
         dlg.resizable(True, True)
-        dlg.geometry("900x650")
+        dlg.geometry("1000x700")
 
-        # ================================================================= top half: left=connection, right=progress
+        # ================================================================= top half: fields (left) + progress (right)
         top_frame = ttk.Frame(dlg)
-        top_frame.pack(fill=tk.X, padx=10, pady=5)
+        top_frame.pack(fill=tk.BOTH, expand=False, padx=10, pady=5)
+
+        top_group = ttk.LabelFrame(top_frame, text=L("dlg.connection"), padding=5)
+        top_group.pack(fill=tk.BOTH, expand=True)
+        top_group.columnconfigure(0, weight=0)
+        top_group.columnconfigure(1, weight=1)
+        top_group.rowconfigure(0, weight=1)
 
         # -- left: connection fields
-        cf = ttk.LabelFrame(top_frame, text=L("dlg.connection"), padding=10)
-        cf.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        cf = ttk.Frame(top_group)
+        cf.grid(row=0, column=0, sticky=tk.NSEW, padx=(0, 8))
         cf.columnconfigure(1, weight=1)
 
         row = 0
@@ -1314,7 +1329,7 @@ class SearchGUI:
 
         ttk.Label(cf, text=L("dlg.output_dir")).grid(row=row, column=0, sticky=tk.W, pady=1)
         out_dir_var = tk.StringVar(value=settings.get("last_output_dir", self.download_dir))
-        ttk.Entry(cf, textvariable=out_dir_var, width=30).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
+        ttk.Entry(cf, textvariable=out_dir_var).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
         row += 1
 
         # policy name + action buttons row
@@ -1332,11 +1347,24 @@ class SearchGUI:
         ttk.Button(br, text=L("dlg.cancel"), command=dlg.destroy).pack(side=tk.LEFT, padx=1)
 
         # -- right: progress panel
-        pf_outer = ttk.LabelFrame(top_frame, text=L("dlg.progress"), padding=10)
-        pf_outer.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10, 0))
-        progress_text = tk.Text(pf_outer, width=40, height=10, wrap=tk.WORD,
+        pf_outer = ttk.LabelFrame(top_group, text=L("dlg.progress"), padding=5)
+        pf_outer.grid(row=0, column=1, sticky=tk.NSEW)
+        pf_outer.rowconfigure(0, weight=1)
+        pf_outer.columnconfigure(0, weight=1)
+
+        progress_text = tk.Text(pf_outer, width=48, height=14, wrap=tk.WORD,
                                 state=tk.DISABLED, font=("Consolas", 9))
-        progress_text.pack(fill=tk.BOTH, expand=True)
+        progress_text.grid(row=0, column=0, sticky=tk.NSEW)
+
+        progress_bar = ttk.Progressbar(pf_outer, mode='indeterminate', length=120)
+        progress_bar.grid(row=1, column=0, sticky=tk.EW, pady=(2, 0))
+
+        def _start_spinner():
+            progress_bar.start(10)
+
+        def _stop_spinner():
+            progress_bar.stop()
+
         def _log_progress(msg):
             progress_text.config(state=tk.NORMAL)
             progress_text.insert(tk.END, f"  {msg}\n")
@@ -1391,6 +1419,7 @@ class SearchGUI:
 
         def _do_connect():
             connect_btn.config(state=tk.DISABLED)
+            _start_spinner()
             _update_status(L("dlg.connecting"))
 
             server = server_var.get().strip()
@@ -1399,6 +1428,7 @@ class SearchGUI:
             try:
                 port = int(port_var.get().strip())
             except ValueError:
+                _stop_spinner()
                 _update_status(L("dlg.invalid_port"))
                 connect_btn.config(state=tk.NORMAL)
                 return
@@ -1406,6 +1436,7 @@ class SearchGUI:
             try:
                 timeout = int(timeout_var.get().strip())
             except ValueError:
+                _stop_spinner()
                 _update_status(L("dlg.invalid_timeout"))
                 connect_btn.config(state=tk.NORMAL)
                 return
@@ -1413,11 +1444,13 @@ class SearchGUI:
             try:
                 page_size = int(page_size_var.get().strip())
             except ValueError:
+                _stop_spinner()
                 _update_status(L("dlg.invalid_pagesize"))
                 connect_btn.config(state=tk.NORMAL)
                 return
 
             if not server or not username:
+                _stop_spinner()
                 _update_status(L("dlg.need_credentials"))
                 connect_btn.config(state=tk.NORMAL)
                 return
@@ -1465,12 +1498,14 @@ class SearchGUI:
                     logging.info("Fetching policy from %s (%s)", server, vendor or "auto")
                     data = _fp(server, port, username, password, vendor=vendor, verify=ssl_var.get(), timeout=timeout, page_size=page_size, package=pkg_var.get().strip() or None)
                     _log_progress(L("dlg.progress.fetched_saving"))
+                    _stop_spinner()
                     ok = _save_and_load_download(data, dlg, status_var)
                     if not ok:
                         connect_btn.config(state=tk.NORMAL)
                     return
 
             except (SystemExit, Exception) as e:
+                _stop_spinner()
                 msg = str(e).strip() or L("dlg.error_connection")
                 logging.error("Connection error: %s", msg)
                 _log_progress(L("dlg.progress.error", msg=msg))
@@ -1478,6 +1513,7 @@ class SearchGUI:
                 connect_btn.config(state=tk.NORMAL)
                 return
 
+            _stop_spinner()
             connect_btn.config(state=tk.NORMAL)
 
         def _make_default_filename(server, pkg_name):
@@ -1528,6 +1564,7 @@ class SearchGUI:
 
             download_btn.config(state=tk.DISABLED)
             connect_btn.config(state=tk.DISABLED)
+            _start_spinner()
             client = _client_ref[0]
             if not client:
                 _update_status(L("dlg.not_connected"))
@@ -1602,6 +1639,7 @@ class SearchGUI:
                 }
 
                 _log_progress(L("dlg.progress.saving_loading"))
+                _stop_spinner()
                 ok = _save_and_load_download(data, dlg, status_var)
                 if not ok:
                     download_btn.config(state=tk.NORMAL)
@@ -1616,6 +1654,7 @@ class SearchGUI:
                 return
 
             except (SystemExit, Exception) as e:
+                _stop_spinner()
                 msg = str(e).strip() or L("dlg.error_download")
                 logging.error("Download error: %s", msg)
                 _log_progress(L("dlg.progress.error", msg=msg))
