@@ -189,21 +189,37 @@ def _extract_ports(arr, lookup):
             continue
         entry = lookup.get(name)
         if entry:
-            proto = entry.get('protocol', '')
-            port = entry.get('port', '')
+            proto = entry.get('protocol', '') or ''
+            port = entry.get('port', '') or ''
+            port_range = entry.get('port-range', '') or ''
             if proto and port:
                 ports.append(f"{proto}/{port}")
             elif port:
                 ports.append(str(port))
+            elif proto and port_range:
+                ports.append(f"{proto}/{port_range}")
+            elif port_range:
+                ports.append(str(port_range))
             elif proto == 'icmp':
                 icmp_type = entry.get('icmp-type', '')
                 icmp_code = entry.get('icmp-code', '')
                 ports.append(f"icmp type={icmp_type} code={icmp_code}")
+            elif proto and not port:
+                ports.append(f"{proto}")
             else:
                 ports.append(name)
         else:
             ports.append(name)
     return '; '.join(ports)
+
+
+def _extract_iso(val):
+    """Extract ISO date string from a dict with iso/posix keys, a plain string, or None."""
+    if isinstance(val, dict):
+        return val.get('iso', '') or str(val.get('posix', ''))
+    if isinstance(val, str):
+        return val
+    return ''
 
 
 def flatten_rule_for_display(layer, rule, lookup):
@@ -213,10 +229,21 @@ def flatten_rule_for_display(layer, rule, lookup):
         action = action.get('name', '')
     track = rule.get('track', '')
     if isinstance(track, dict):
-        track = track.get('type', '') or ''
+        ttype = track.get('type', '') or ''
+        tname = track.get('name', '') or ''
+        if tname and ttype and tname != ttype:
+            track = f'{tname} ({ttype})'
+        elif ttype:
+            track = ttype
+        elif tname:
+            track = tname
+        else:
+            track = ''
 
     meta = rule.get('meta-info', {}) or {}
-    hm = rule.get('hits', {}) or {}
+    hm = rule.get('hits', None)
+    if hm is None:
+        hm = {}
 
     parent = rule.get('_parent_rule', '')
     idx = rule.get('_inline_index', '')
@@ -238,9 +265,9 @@ def flatten_rule_for_display(layer, rule, lookup):
         "action": action,
         "track": track,
         "comments": rule.get('comments', ''),
-        "hits": hm.get('hits', '') if isinstance(hm, dict) else '',
-        "creation-time": meta.get('creation-time', {}).get('iso', '') if isinstance(meta.get('creation-time'), dict) else '',
-        "last-modified": meta.get('last-modified', {}).get('iso', '') if isinstance(meta.get('last-modified'), dict) else '',
+        "hits": str(hm.get('hits', '')) if isinstance(hm, dict) else str(hm) if hm else '',
+        "creation-time": _extract_iso(meta.get('creation-time')),
+        "last-modified": _extract_iso(meta.get('last-modified')),
     }
 
 
@@ -269,7 +296,7 @@ def flatten_nat_for_display(rule, lookup):
         install = install.get('name', '')
 
     meta = rule.get('meta-info', {}) or {}
-    hm = rule.get('hits', {}) or {}
+    hm = rule.get('hits', None) or {}
 
     uid = rule.get('uid', '')
     return {
@@ -293,9 +320,9 @@ def flatten_nat_for_display(rule, lookup):
         "action": action,
         "install-on": install,
         "comments": rule.get('comments', ''),
-        "hits": hm.get('hits', '') if isinstance(hm, dict) else '',
-        "creation-time": meta.get('creation-time', {}).get('iso', '') if isinstance(meta.get('creation-time'), dict) else '',
-        "last-modified": meta.get('last-modified', {}).get('iso', '') if isinstance(meta.get('last-modified'), dict) else '',
+        "hits": str(hm.get('hits', '')) if isinstance(hm, dict) else str(hm) if hm else '',
+        "creation-time": _extract_iso(meta.get('creation-time')),
+        "last-modified": _extract_iso(meta.get('last-modified')),
     }
 
 
@@ -398,8 +425,8 @@ class SearchGUI:
                  "service", "service-ports",
                   "action", "track", "comments",
                   "hits", "creation-time", "last-modified")
-    OBJ_COLS = ("name", "ip-address", "subnet", "mask-length", "type",
-                "comments", "category", "risk", "_objtype")
+    OBJ_COLS = ("name", "ip-address", "ipv4-address", "subnet", "mask-length",
+                "type", "comments", "category", "risk", "_objtype")
 
     def __init__(self, root, initial_file=None):
         self.root = root
@@ -566,9 +593,10 @@ class SearchGUI:
         for col in c:
             self.obj_tree.heading(col, text=L("col." + col), command=lambda _c=col: self._sort(self.obj_tree, _c, False))
             self.obj_tree.column(col, width=120, minwidth=60)
-        self.obj_tree.column("name", width=180)
+        self.obj_tree.column("name", width=160)
         self.obj_tree.column("comments", width=200)
-        self.obj_tree.column("_objtype", width=100)
+        self.obj_tree.column("_objtype", width=90)
+        self.obj_tree.column("ipv4-address", width=130)
         self.obj_tree._col_lang_key = "col."  # marker for language refresh
 
         vsb = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.obj_tree.yview)
@@ -619,8 +647,8 @@ class SearchGUI:
             if isinstance(v, (int, float)):
                 return str(v)
             return v if v else ''
-        fields = [_fmt(o.get(k)) for k in ('name', 'ip-address', 'subnet', 'comments',
-                                            'category', '_objtype')]
+        fields = [_fmt(o.get(k)) for k in ('name', 'ip-address', 'ipv4-address',
+                                            'subnet', 'comments', 'category', '_objtype')]
         return any(match_pattern(f, term) for f in fields)
 
     def _obj_detail(self, event):

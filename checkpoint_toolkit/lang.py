@@ -425,6 +425,7 @@ T = {
     # ── column headings ──
     "col.name": {"en": "Name", "fr": "Nom", "de": "Name", "it": "Nome", "sk": "N\u00e1zov"},
     "col.ip-address": {"en": "IP Address", "fr": "Adresse IP", "de": "IP-Adresse", "it": "Indirizzo IP", "sk": "IP adresa"},
+    "col.ipv4-address": {"en": "IPv4 Address", "fr": "Adresse IPv4", "de": "IPv4-Adresse", "it": "Indirizzo IPv4", "sk": "IPv4 adresa"},
     "col.subnet": {"en": "Subnet", "fr": "Sous-r\u00e9seau", "de": "Subnetz", "it": "Subnet", "sk": "Podsie\u0165"},
     "col.mask-length": {"en": "Mask Length", "fr": "Longueur masque", "de": "Maskenl\u00e4nge", "it": "Lunghezza maschera", "sk": "D\u013a\u017eka masky"},
     "col.type": {"en": "Type", "fr": "Type", "de": "Typ", "it": "Tipo", "sk": "Typ"},
