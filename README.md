@@ -4,6 +4,10 @@
 
 Multi-vendor toolkit (Checkpoint, Palo Alto, Fortinet) to convert, fetch, and search firewall policies with a Tkinter GUI and CLI converter.
 
+⚠️ **Checkpoint** — Test in progress, some features may have rough edges.
+⚠️ **Palo Alto** — Not yet tested against a live firewall.
+⚠️ **Fortinet** — Not yet tested against a live firewall.
+
 ```
 firewall-tools/
 ├── examples/                      # example policies & CSVs

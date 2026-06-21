@@ -1646,13 +1646,6 @@ class SearchGUI:
                     logging.warning("Threat fetch failed: %s", e)
                     threat_rules = []
 
-                _log_progress(L("dlg.progress.fetching_objects"))
-                _update_status(L("dlg.fetch_objects"))
-                objects = client.fetch_all_objects()
-                total_objs = sum(len(v) for v in objects.values())
-                logging.info("Objects fetched: %d total across %d types", total_objs, len(objects))
-                _log_progress(L("dlg.progress.objects_total", count=total_objs))
-
                 _log_progress(L("dlg.progress.fetching_nat"))
                 _update_status(L("dlg.fetch_nat"))
                 nat_rules = []
@@ -1671,6 +1664,13 @@ class SearchGUI:
                     logging.info("NAT rules: %d", len(nat_rules))
                 except Exception as e:
                     logging.warning("NAT fetch failed: %s", e)
+
+                _log_progress(L("dlg.progress.fetching_objects"))
+                _update_status(L("dlg.fetch_objects"))
+                objects = client.fetch_all_objects()
+                total_objs = sum(len(v) for v in objects.values())
+                logging.info("Objects fetched: %d total across %d types", total_objs, len(objects))
+                _log_progress(L("dlg.progress.objects_total", count=total_objs))
 
                 data = {
                     "policy-package": {

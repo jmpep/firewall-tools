@@ -1,5 +1,7 @@
 # Checkpoint Firewall Policy Toolkit
 
+⚠️ **Checkpoint** — Test in progress, some features may have rough edges.
+
 Tools to export, convert, and search Checkpoint firewall policies.
 
 ## Components

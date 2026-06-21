@@ -128,6 +128,7 @@ class CheckpointAPIClient:
         self.timeout = timeout
         self.page_size = page_size
         self.sid = None
+        self._cached_objects = {}
         self._login(username, password)
 
     def _ctx(self):
@@ -170,6 +171,11 @@ class CheckpointAPIClient:
         payload["offset"] = 0
         while True:
             res = self._post(endpoint, payload)
+            # Cache objects-dictionary from rulebase/object endpoints
+            for obj in res.get("objects-dictionary") or []:
+                uid = obj.get("uid")
+                if uid:
+                    self._cached_objects[uid] = obj
             if result_key is not None:
                 key = result_key
             else:
@@ -213,7 +219,7 @@ class CheckpointAPIClient:
             p = {
                 "name": layer_name,
                 "details-level": "full",
-                "use-object-dictionary": False,
+                "use-object-dictionary": True,
             }
             if pkg:
                 p["package"] = pkg
@@ -255,6 +261,7 @@ class CheckpointAPIClient:
         try:
             return self._paginate("show-https-inspection-rulebase", {
                 "details-level": "full",
+                "use-object-dictionary": True,
             }, result_key="rulebase")
         except Exception as e:
             print(f"  Warning: HTTPS inspection not available ({e})")
@@ -264,6 +271,7 @@ class CheckpointAPIClient:
         try:
             return self._paginate("show-threat-rulebase", {
                 "details-level": "full",
+                "use-object-dictionary": True,
             }, result_key="rulebase")
         except Exception as e:
             print(f"  Warning: Threat rulebase not available ({e})")
@@ -271,7 +279,7 @@ class CheckpointAPIClient:
 
     def fetch_nat_rulebase(self, package=None):
         try:
-            p = {"details-level": "full"}
+            p = {"details-level": "full", "use-object-dictionary": True}
             if package:
                 p["package"] = package
             result = self._paginate("show-nat-rulebase", p, result_key="rulebase")
@@ -286,7 +294,7 @@ class CheckpointAPIClient:
                 for pkg in pkgs:
                     try:
                         result = self._paginate("show-nat-rulebase",
-                                                {"details-level": "full", "package": pkg},
+                                                {"details-level": "full", "use-object-dictionary": True, "package": pkg},
                                                 result_key="rulebase")
                         if result:
                             return result
@@ -298,6 +306,50 @@ class CheckpointAPIClient:
 
     # ------------------------------------------------------------------ objects
 
+    SINGULAR_TO_PLURAL = {
+        "host": "hosts",
+        "network": "networks",
+        "group": "groups",
+        "address-range": "address-ranges",
+        "service-tcp": "services-tcp",
+        "service-udp": "services-udp",
+        "service-icmp": "services-icmp",
+        "service-other": "services-other",
+        "service-dce-rpc": "services-dce-rpc",
+        "service-rpc": "services-rpc",
+        "service-sctp": "services-sctp",
+        "service-icmp6": "services-icmp6",
+        "multicast-address-range": "multicast-address-ranges",
+        "service-group": "service-groups",
+        "application-site": "application-sites",
+        "application-site-category": "application-site-categories",
+        "application-site-group": "application-site-groups",
+        "time": "times",
+        "user-group": "users",
+        "security-zone": "security-zones",
+        "dynamic-object": "dynamic-objects",
+        "dns-domain": "dns-domains",
+        "group-with-exclusion": "groups-with-exclusion",
+        "time-group": "time-groups",
+        "application-group": "application-groups",
+        "exception-group": "exception-groups",
+        "tag": "tags",
+        "simple-gateway": "simple-gateways",
+        "simple-cluster": "simple-clusters",
+        "trusted-client": "trusted-clients",
+        "opsec-application": "opsec-applications",
+        "data-center": "data-centers",
+        "data-center-object": "data-center-objects",
+        "cpmi-gateway": "cpmi-gateways",
+        "cpmi-gateway-cluster": "cpmi-gateway-clusters",
+        "vsx-net-object": "vsx-net-objects",
+        "vsx-objects": "vsx-objects",
+        "wildcard": "wildcards",
+        "updatable-object": "updatable-objects",
+        "access-role": "access-roles",
+        "threat-profile": "threat-profiles",
+    }
+
     def _fetch_objects(self, show_cmd, result_key=None):
         try:
             return self._paginate(show_cmd, {"details-level": "full"},
@@ -308,22 +360,35 @@ class CheckpointAPIClient:
 
     def fetch_all_objects(self):
         objects = {}
-        objects["hosts"] = self._fetch_objects("show-hosts", result_key="hosts")
-        objects["networks"] = self._fetch_objects("show-networks", result_key="networks")
-        objects["groups"] = self._fetch_objects("show-groups", result_key="groups")
-        objects["address-ranges"] = self._fetch_objects("show-address-ranges", result_key="address-ranges")
-        objects["services-tcp"] = self._fetch_objects("show-services-tcp", result_key="tcp-services")
-        objects["services-udp"] = self._fetch_objects("show-services-udp", result_key="udp-services")
-        objects["services-icmp"] = self._fetch_objects("show-services-icmp", result_key="icmp-services")
-        objects["services-other"] = self._fetch_objects("show-services-other", result_key="other-services")
-        objects["service-groups"] = self._fetch_objects("show-service-groups", result_key="service-groups")
-        objects["application-sites"] = self._fetch_objects("show-application-sites", result_key="application-sites")
-        objects["application-site-categories"] = self._fetch_objects("show-application-site-categories", result_key="application-site-categories")
-        objects["time"] = self._fetch_objects("show-time", result_key="time")
-        objects["users"] = self._fetch_objects("show-user-groups", result_key="user-groups")
-        objects["security-zones"] = self._fetch_objects("show-security-zones", result_key="security-zones")
-        objects["dynamic-objects"] = self._fetch_objects("show-dynamic-objects", result_key="dynamic-objects")
-        objects["dns-domains"] = self._fetch_objects("show-dns-domains", result_key="dns-domains")
+        for obj in self._cached_objects.values():
+            otype = obj.get("type", "")
+            pkey = self.SINGULAR_TO_PLURAL.get(otype)
+            if pkey is None:
+                continue
+            if pkey not in objects:
+                objects[pkey] = []
+            objects[pkey].append(obj)
+        if objects:
+            total = sum(len(v) for v in objects.values())
+            print(f"  Collected {total} objects from rulebase objects-dictionary ({len(objects)} types)")
+            return objects
+        # Fallback: individual show-* calls with auto-detected result keys
+        print("  No objects-dictionary found, falling back to individual show-* calls")
+        okeys = [
+            ("show-hosts", "hosts"), ("show-networks", "networks"),
+            ("show-groups", "groups"), ("show-address-ranges", "address-ranges"),
+            ("show-services-tcp", "services-tcp"), ("show-services-udp", "services-udp"),
+            ("show-services-icmp", "services-icmp"), ("show-services-other", "services-other"),
+            ("show-service-groups", "service-groups"),
+            ("show-application-sites", "application-sites"),
+            ("show-application-site-categories", "application-site-categories"),
+            ("show-time", "time"), ("show-user-groups", "users"),
+            ("show-security-zones", "security-zones"),
+            ("show-dynamic-objects", "dynamic-objects"),
+            ("show-dns-domains", "dns-domains"),
+        ]
+        for cmd, key in okeys:
+            objects[key] = self._fetch_objects(cmd)
         return objects
 
     # ------------------------------------------------------------------ assemble
