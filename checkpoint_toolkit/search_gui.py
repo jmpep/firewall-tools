@@ -1625,6 +1625,25 @@ class SearchGUI:
                 logging.info("Objects fetched: %d total across %d types", total_objs, len(objects))
                 _log_progress(L("dlg.progress.objects_total", count=total_objs))
 
+                _log_progress(L("dlg.progress.fetching_nat"))
+                _update_status(L("dlg.fetch_nat"))
+                nat_rules = []
+                try:
+                    raw_nat = client.fetch_nat_rulebase()
+                    flat_nat = []
+                    def _extract_nat(items):
+                        for item in items:
+                            t = item.get("type", "")
+                            if t == "nat-section":
+                                _extract_nat(item.get("rulebase", []))
+                            else:
+                                flat_nat.append(item)
+                    _extract_nat(raw_nat)
+                    nat_rules = flat_nat
+                    logging.info("NAT rules: %d", len(nat_rules))
+                except Exception as e:
+                    logging.warning("NAT fetch failed: %s", e)
+
                 data = {
                     "policy-package": {
                         "name": pkg_name,
@@ -1634,6 +1653,7 @@ class SearchGUI:
                         "access-control-policy": {"layers": layers_data},
                         "https-inspection-policy": {"rules": https_rules},
                         "threat-prevention-policy": {"rulebase": threat_rules},
+                        "nat-policy": {"rules": nat_rules},
                     },
                     "objects": objects,
                 }

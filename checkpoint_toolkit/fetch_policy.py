@@ -269,6 +269,33 @@ class CheckpointAPIClient:
             print(f"  Warning: Threat rulebase not available ({e})")
             return []
 
+    def fetch_nat_rulebase(self, package=None):
+        try:
+            p = {"details-level": "full"}
+            if package:
+                p["package"] = package
+            result = self._paginate("show-nat-rulebase", p, result_key="rulebase")
+            if result:
+                return result
+        except Exception:
+            pass
+        # auto-discover package
+        if not package:
+            try:
+                pkgs = self.fetch_packages()
+                for pkg in pkgs:
+                    try:
+                        result = self._paginate("show-nat-rulebase",
+                                                {"details-level": "full", "package": pkg},
+                                                result_key="rulebase")
+                        if result:
+                            return result
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+        return []
+
     # ------------------------------------------------------------------ objects
 
     def _fetch_objects(self, show_cmd, result_key=None):
@@ -345,6 +372,9 @@ class CheckpointAPIClient:
         print("  Fetching threat prevention policy ...")
         threat_rules = self.fetch_threat_rulebase()
 
+        print("  Fetching NAT policy ...")
+        nat_rules = self.fetch_nat_rulebase(package=package)
+
         print("  Fetching objects ...")
         objects = self.fetch_all_objects()
 
@@ -357,6 +387,7 @@ class CheckpointAPIClient:
                 "access-control-policy": access_policy,
                 "https-inspection-policy": {"rules": https_rules},
                 "threat-prevention-policy": {"rulebase": threat_rules},
+                "nat-policy": {"rules": nat_rules},
             },
             "objects": objects,
             "_vendor": "checkpoint",
