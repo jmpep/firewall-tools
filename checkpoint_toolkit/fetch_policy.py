@@ -12,7 +12,6 @@ import xml.etree.ElementTree as ET
 
 VENDORS = ("checkpoint", "paloalto", "fortinet")
 
-
 # ============================================================ SSL helper
 
 def _create_ctx(verify):
@@ -210,14 +209,37 @@ class CheckpointAPIClient:
         return [l["name"] for l in items]
 
     def fetch_rulebase(self, layer_name, package=None):
-        payload = {
-            "name": layer_name,
-            "details-level": "full",
-            "use-object-dictionary": False,
-        }
+        def _try(pkg):
+            p = {
+                "name": layer_name,
+                "details-level": "full",
+                "use-object-dictionary": False,
+            }
+            if pkg:
+                p["package"] = pkg
+            return self._paginate("show-access-rulebase", p, result_key="rulebase")
+
+        # try explicit package, then auto-discovered packages, then no package
+        candidates = []
         if package:
-            payload["package"] = package
-        items = self._paginate("show-access-rulebase", payload, result_key="rulebase")
+            candidates.append(package)
+        else:
+            pkgs = self.fetch_packages()
+            candidates.extend(pkgs)
+            candidates.append(None)  # fallback: no package context
+
+        items = []
+        used_pkg = None
+        for pkg in candidates:
+            try:
+                result = _try(pkg)
+                if result:
+                    items = result
+                    used_pkg = pkg
+                    break
+            except Exception:
+                continue
+
         uid = ""
         if items:
             uid = items[0].get("uid", "")
@@ -227,7 +249,7 @@ class CheckpointAPIClient:
                 uid = single.get("uid", "")
             except Exception:
                 pass
-        return {"rulebase": items, "uid": uid}
+        return {"rulebase": items, "uid": uid, "_package": used_pkg}
 
     def fetch_https_inspection(self):
         try:

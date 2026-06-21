@@ -139,7 +139,6 @@ def extract_nat_rules(data):
     for r in data.get('policy-package', {}).get('nat-policy', {}).get('rules', []):
         yield r
 
-
 def _names_ips(arr, lookup):
     """Join object names with inline IP resolution."""
     if not isinstance(arr, list):
@@ -1433,18 +1432,18 @@ class SearchGUI:
 
             try:
                 if is_checkpoint:
-                    _log_progress(f"Connecting to {server}:{port} as {username}")
+                    _log_progress(L("dlg.progress.connecting", server=server, port=port, username=username))
                     _update_status(L("dlg.connecting"))
                     client = CheckpointAPIClient(server, username, password,
                                                   port=port, verify=ssl_var.get(),
                                                   timeout=timeout, page_size=page_size)
                     _client_ref[0] = client
                     logging.info("Connected to %s as %s (Checkpoint)", server, username)
-                    _log_progress("Connected — fetching layers")
+                    _log_progress(L("dlg.progress.connected_layers"))
                     _update_status(L("dlg.fetching_layers"))
                     dlg.update()
                     layer_names = client.fetch_layers()
-                    _log_progress(f"Found {len(layer_names)} layer(s)")
+                    _log_progress(L("dlg.progress.layers_found", count=len(layer_names)))
                     for cb in layer_checkboxes:
                         cb[0].destroy()
                     layer_checkboxes.clear()
@@ -1462,10 +1461,10 @@ class SearchGUI:
                 else:
                     # PA / FortiGate: fetch all directly
                     from fetch_policy import fetch_policy as _fp
-                    _log_progress(f"Fetching policy from {server} ({vendor or 'auto'})")
+                    _log_progress(L("dlg.progress.fetching_policy", server=server, vendor=vendor or "auto"))
                     logging.info("Fetching policy from %s (%s)", server, vendor or "auto")
                     data = _fp(server, port, username, password, vendor=vendor, verify=ssl_var.get(), timeout=timeout, page_size=page_size, package=pkg_var.get().strip() or None)
-                    _log_progress("Policy fetched — saving")
+                    _log_progress(L("dlg.progress.fetched_saving"))
                     ok = _save_and_load_download(data, dlg, status_var)
                     if not ok:
                         connect_btn.config(state=tk.NORMAL)
@@ -1474,7 +1473,7 @@ class SearchGUI:
             except (SystemExit, Exception) as e:
                 msg = str(e).strip() or L("dlg.error_connection")
                 logging.error("Connection error: %s", msg)
-                _log_progress(f"Error: {msg}")
+                _log_progress(L("dlg.progress.error", msg=msg))
                 _update_status(L("dlg.error_prefix", msg=msg))
                 connect_btn.config(state=tk.NORMAL)
                 return
@@ -1538,10 +1537,10 @@ class SearchGUI:
                 _update_status(L("dlg.fetch_rules"))
                 layers_data = []
                 for i, ln in enumerate(selected):
-                    _log_progress(f"Layer {i+1}/{len(selected)}: {ln}")
+                    _log_progress(L("dlg.progress.layer", n=i+1, total=len(selected), name=ln))
                     _update_status(L("dlg.fetch_layer_n", n=i+1, total=len(selected), name=ln))
                     logging.info("Fetching rulebase: %s", ln)
-                    rb = client.fetch_rulebase(ln, package=pkg_name)
+                    rb = client.fetch_rulebase(ln)
                     layer = {"name": ln, "uid": rb.get("uid", ""),
                              "rules": [], "inline-layers": []}
                     seen = set()
@@ -1564,7 +1563,7 @@ class SearchGUI:
                     _extract(rb.get("rulebase", []))
                     layers_data.append(layer)
 
-                _log_progress("Fetching HTTPS inspection rules")
+                _log_progress(L("dlg.progress.fetching_https"))
                 _update_status(L("dlg.fetch_https"))
                 try:
                     https_rules = client.fetch_https_inspection()
@@ -1573,7 +1572,7 @@ class SearchGUI:
                     logging.warning("HTTPS fetch failed: %s", e)
                     https_rules = []
 
-                _log_progress("Fetching threat prevention rules")
+                _log_progress(L("dlg.progress.fetching_threat"))
                 _update_status(L("dlg.fetch_threat"))
                 try:
                     threat_rules = client.fetch_threat_rulebase()
@@ -1582,12 +1581,12 @@ class SearchGUI:
                     logging.warning("Threat fetch failed: %s", e)
                     threat_rules = []
 
-                _log_progress("Fetching objects")
+                _log_progress(L("dlg.progress.fetching_objects"))
                 _update_status(L("dlg.fetch_objects"))
                 objects = client.fetch_all_objects()
                 total_objs = sum(len(v) for v in objects.values())
                 logging.info("Objects fetched: %d total across %d types", total_objs, len(objects))
-                _log_progress(f"Objects: {total_objs} total")
+                _log_progress(L("dlg.progress.objects_total", count=total_objs))
 
                 data = {
                     "policy-package": {
@@ -1602,7 +1601,7 @@ class SearchGUI:
                     "objects": objects,
                 }
 
-                _log_progress("Saving and loading data")
+                _log_progress(L("dlg.progress.saving_loading"))
                 ok = _save_and_load_download(data, dlg, status_var)
                 if not ok:
                     download_btn.config(state=tk.NORMAL)
@@ -1610,7 +1609,7 @@ class SearchGUI:
                     return
                 try:
                     client.logout()
-                    _log_progress("Logged out")
+                    _log_progress(L("dlg.progress.logged_out"))
                     logging.info("Logged out from %s", server_var.get().strip())
                 except Exception:
                     pass
@@ -1619,7 +1618,7 @@ class SearchGUI:
             except (SystemExit, Exception) as e:
                 msg = str(e).strip() or L("dlg.error_download")
                 logging.error("Download error: %s", msg)
-                _log_progress(f"Error: {msg}")
+                _log_progress(L("dlg.progress.error", msg=msg))
                 _update_status(L("dlg.error_prefix", msg=msg))
                 download_btn.config(state=tk.NORMAL)
                 connect_btn.config(state=tk.NORMAL)
