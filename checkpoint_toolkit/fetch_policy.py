@@ -174,7 +174,13 @@ class CheckpointAPIClient:
             if result_key is not None:
                 key = result_key
             else:
-                key = endpoint.replace("show-", "").replace("-", "_")
+                key = "objects"
+                # try both hyphenated and underscored forms
+                candidate = endpoint.replace("show-", "")
+                for k in (candidate, candidate.replace("-", "_")):
+                    if k in res:
+                        key = k
+                        break
             items = res.get(key) or []
             if not items:
                 break
@@ -188,19 +194,40 @@ class CheckpointAPIClient:
             payload["offset"] += payload["limit"]
         return all_data
 
-    # ------------------------------------------------------------------ layers & rules
+    # ------------------------------------------------------------------ packages, layers & rules
+
+    def fetch_packages(self):
+        """Return list of policy package names."""
+        try:
+            items = self._paginate("show-packages", {}, result_key="packages")
+            return [p["name"] for p in items]
+        except Exception as e:
+            print(f"  Warning: show-packages failed ({e})")
+            return []
 
     def fetch_layers(self):
         items = self._paginate("show-access-layers", {}, result_key="access-layers")
         return [l["name"] for l in items]
 
-    def fetch_rulebase(self, layer_name):
-        items = self._paginate("show-access-rulebase", {
+    def fetch_rulebase(self, layer_name, package=None):
+        payload = {
             "name": layer_name,
             "details-level": "full",
             "use-object-dictionary": False,
-        }, result_key="rulebase")
-        return {"rulebase": items, "uid": items[0].get("uid", "") if items else ""}
+        }
+        if package:
+            payload["package"] = package
+        items = self._paginate("show-access-rulebase", payload, result_key="rulebase")
+        uid = ""
+        if items:
+            uid = items[0].get("uid", "")
+        else:
+            try:
+                single = self._post("show-access-rulebase", {"name": layer_name, "limit": 1, "details-level": "uid"})
+                uid = single.get("uid", "")
+            except Exception:
+                pass
+        return {"rulebase": items, "uid": uid}
 
     def fetch_https_inspection(self):
         try:
@@ -235,26 +262,39 @@ class CheckpointAPIClient:
         objects["hosts"] = self._fetch_objects("show-hosts", result_key="hosts")
         objects["networks"] = self._fetch_objects("show-networks", result_key="networks")
         objects["groups"] = self._fetch_objects("show-groups", result_key="groups")
+        objects["address-ranges"] = self._fetch_objects("show-address-ranges", result_key="address-ranges")
         objects["services-tcp"] = self._fetch_objects("show-services-tcp", result_key="tcp-services")
         objects["services-udp"] = self._fetch_objects("show-services-udp", result_key="udp-services")
         objects["services-icmp"] = self._fetch_objects("show-services-icmp", result_key="icmp-services")
         objects["services-other"] = self._fetch_objects("show-services-other", result_key="other-services")
+        objects["service-groups"] = self._fetch_objects("show-service-groups", result_key="service-groups")
         objects["application-sites"] = self._fetch_objects("show-application-sites", result_key="application-sites")
+        objects["application-site-categories"] = self._fetch_objects("show-application-site-categories", result_key="application-site-categories")
         objects["time"] = self._fetch_objects("show-time", result_key="time")
         objects["users"] = self._fetch_objects("show-user-groups", result_key="user-groups")
+        objects["security-zones"] = self._fetch_objects("show-security-zones", result_key="security-zones")
+        objects["dynamic-objects"] = self._fetch_objects("show-dynamic-objects", result_key="dynamic-objects")
+        objects["dns-domains"] = self._fetch_objects("show-dns-domains", result_key="dns-domains")
         return objects
 
     # ------------------------------------------------------------------ assemble
 
-    def fetch_all(self):
+    def fetch_all(self, package=None):
         print("Fetching access layers ...")
         layer_names = self.fetch_layers()
         print(f"  Found layers: {layer_names}")
 
+        # auto-discover packages if not specified
+        if not package:
+            pkgs = self.fetch_packages()
+            if pkgs:
+                package = pkgs[0]
+                print(f"  Auto-selected package: {package}")
+
         access_policy = {"layers": []}
         for name in layer_names:
             print(f"  Fetching rulebase for '{name}' ...")
-            rb = self.fetch_rulebase(name)
+            rb = self.fetch_rulebase(name, package=package)
             layer = {"name": name, "uid": rb.get("uid", ""),
                      "rules": [], "inline-layers": []}
             seen = set()
@@ -1429,7 +1469,7 @@ VENDOR_CLIENTS = {
 
 
 def fetch_policy(server, port, username, password, vendor=None, verify=False,
-                 timeout=300, page_size=200):
+                 timeout=300, page_size=200, package=None):
     """Detect vendor (if not given) and fetch policy data."""
     if vendor and vendor not in VENDORS:
         raise ValueError(f"Unknown vendor '{vendor}'. Choose from: {', '.join(VENDORS)}")
@@ -1450,7 +1490,10 @@ def fetch_policy(server, port, username, password, vendor=None, verify=False,
     print(f"Connecting to {server}:{port} as {username} ({vendor}) ...")
     client = cls(server, username, password, port=port, verify=verify,
                  timeout=timeout, page_size=page_size)
-    data = client.fetch_all()
+    if vendor == "checkpoint" and package:
+        data = client.fetch_all(package=package)
+    else:
+        data = client.fetch_all()
     client.logout()
     return data
 
@@ -1471,6 +1514,8 @@ def main():
                         help="Firewall vendor (auto-detect if omitted)")
     parser.add_argument("--output", default=None,
                         help="Output JSON file (default: outputs/<policy_name>.json)")
+    parser.add_argument("--package", default=None,
+                        help="Policy package name (Checkpoint only; auto-detected if omitted)")
     parser.add_argument("--ssl-verify", action="store_true",
                         help="Verify SSL certificate")
     args = parser.parse_args()
@@ -1491,7 +1536,8 @@ def main():
         os.makedirs(out_dir, exist_ok=True)
 
     data = fetch_policy(args.server, args.port, args.username, password,
-                        vendor=args.vendor, verify=args.ssl_verify)
+                        vendor=args.vendor, verify=args.ssl_verify,
+                        package=args.package)
 
     with open(output, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, default=str)

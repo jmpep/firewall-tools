@@ -188,6 +188,8 @@ T = {
     "dlg.title": {"en": "Download Policy from Firewall", "fr": "T\u00e9l\u00e9charger police de pare-feux",
                   "de": "Policy herunterladen", "it": "Scarica policy dal firewall",
                   "sk": "Stiahnu\u0165 pravidl\u00e1 z firewallu"},
+    "dlg.progress": {"en": "Progress", "fr": "Progr\u00e8s", "de": "Fortschritt", "it": "Avanzamento", "sk": "Priebeh"},
+    "dlg.status": {"en": "Status", "fr": "\u00c9tat", "de": "Status", "it": "Stato", "sk": "Stav"},
     "dlg.connection": {"en": "Connection", "fr": "Connexion", "de": "Verbindung",
                        "it": "Connessione", "sk": "Pripojenie"},
     "dlg.server": {"en": "Server:", "fr": "Serveur :", "de": "Server:", "it": "Server:", "sk": "Server:"},

@@ -1260,75 +1260,94 @@ class SearchGUI:
         dlg.transient(self.root)
         dlg.grab_set()
         dlg.resizable(True, True)
+        dlg.geometry("900x650")
 
-        # -- connection frame
-        cf = ttk.LabelFrame(dlg, text=L("dlg.connection"), padding=10)
-        cf.pack(fill=tk.X, padx=10, pady=5)
+        # ================================================================= top half: left=connection, right=progress
+        top_frame = ttk.Frame(dlg)
+        top_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        # -- left: connection fields
+        cf = ttk.LabelFrame(top_frame, text=L("dlg.connection"), padding=10)
+        cf.pack(side=tk.LEFT, fill=tk.X, expand=True)
         cf.columnconfigure(1, weight=1)
 
-        ttk.Label(cf, text=L("dlg.server")).grid(row=0, column=0, sticky=tk.W, pady=2)
+        row = 0
+        ttk.Label(cf, text=L("dlg.server")).grid(row=row, column=0, sticky=tk.W, pady=1)
         server_var = tk.StringVar(value=settings.get("last_server") or "192.168.1.1")
-        ttk.Entry(cf, textvariable=server_var, width=40).grid(row=0, column=1, padx=5, pady=2)
+        ttk.Entry(cf, textvariable=server_var, width=30).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
+        row += 1
 
-        ttk.Label(cf, text=L("dlg.username")).grid(row=1, column=0, sticky=tk.W, pady=2)
+        ttk.Label(cf, text=L("dlg.username")).grid(row=row, column=0, sticky=tk.W, pady=1)
         user_var = tk.StringVar(value=settings.get("last_username") or "admin")
-        ttk.Entry(cf, textvariable=user_var, width=40).grid(row=1, column=1, padx=5, pady=2)
+        ttk.Entry(cf, textvariable=user_var, width=30).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
+        row += 1
 
-        ttk.Label(cf, text=L("dlg.password")).grid(row=2, column=0, sticky=tk.W, pady=2)
+        ttk.Label(cf, text=L("dlg.password")).grid(row=row, column=0, sticky=tk.W, pady=1)
         pass_var = tk.StringVar()
-        ttk.Entry(cf, textvariable=pass_var, width=40, show="*").grid(row=2, column=1, padx=5, pady=2)
+        ttk.Entry(cf, textvariable=pass_var, width=30, show="*").grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
+        row += 1
 
-        ttk.Label(cf, text=L("dlg.port")).grid(row=3, column=0, sticky=tk.W, pady=2)
+        ttk.Label(cf, text=L("dlg.port")).grid(row=row, column=0, sticky=tk.W, pady=1)
+        pf = ttk.Frame(cf); pf.grid(row=row, column=1, sticky=tk.W, padx=4, pady=1)
         port_var = tk.StringVar(value=str(settings.get("last_port", 443)))
-        ttk.Entry(cf, textvariable=port_var, width=10).grid(row=3, column=1, sticky=tk.W, padx=5, pady=2)
-
+        ttk.Entry(pf, textvariable=port_var, width=8).pack(side=tk.LEFT)
         ssl_var = tk.BooleanVar(value=settings.get("last_verify_ssl", False))
-        ttk.Checkbutton(cf, text=L("dlg.verify_ssl"), variable=ssl_var).grid(row=3, column=1, padx=80, pady=2, sticky=tk.W)
+        ttk.Checkbutton(pf, text=L("dlg.verify_ssl"), variable=ssl_var).pack(side=tk.LEFT, padx=8)
+        row += 1
 
-        ttk.Label(cf, text=L("dlg.timeout")).grid(row=4, column=0, sticky=tk.W, pady=2)
+        ttk.Label(cf, text=L("dlg.timeout")).grid(row=row, column=0, sticky=tk.W, pady=1)
         timeout_var = tk.StringVar(value=str(self.timeout))
-        ttk.Entry(cf, textvariable=timeout_var, width=10).grid(row=4, column=1, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(cf, textvariable=timeout_var, width=8).grid(row=row, column=1, sticky=tk.W, padx=4, pady=1)
+        row += 1
 
-        ttk.Label(cf, text=L("dlg.page_size")).grid(row=5, column=0, sticky=tk.W, pady=2)
+        ttk.Label(cf, text=L("dlg.page_size")).grid(row=row, column=0, sticky=tk.W, pady=1)
         page_size_var = tk.StringVar(value=str(self.page_size))
-        ttk.Entry(cf, textvariable=page_size_var, width=10).grid(row=5, column=1, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(cf, textvariable=page_size_var, width=8).grid(row=row, column=1, sticky=tk.W, padx=4, pady=1)
+        row += 1
 
-        ttk.Label(cf, text=L("dlg.vendor")).grid(row=6, column=0, sticky=tk.W, pady=2)
+        ttk.Label(cf, text=L("dlg.vendor")).grid(row=row, column=0, sticky=tk.W, pady=1)
         vendor_var = tk.StringVar(value=settings.get("last_vendor", "auto"))
         vendor_combo = ttk.Combobox(cf, textvariable=vendor_var,
                                     values=["auto", "checkpoint", "paloalto", "fortinet"],
-                                    state="readonly", width=20)
-        vendor_combo.grid(row=6, column=1, sticky=tk.W, padx=5, pady=2)
+                                    state="readonly", width=18)
+        vendor_combo.grid(row=row, column=1, sticky=tk.W, padx=4, pady=1)
+        row += 1
 
-        ttk.Label(cf, text=L("dlg.output_dir")).grid(row=7, column=0, sticky=tk.W, pady=2)
+        ttk.Label(cf, text=L("dlg.output_dir")).grid(row=row, column=0, sticky=tk.W, pady=1)
         out_dir_var = tk.StringVar(value=settings.get("last_output_dir", self.download_dir))
-        ttk.Entry(cf, textvariable=out_dir_var, width=30).grid(row=7, column=1, sticky=tk.W, padx=5, pady=2)
+        ttk.Entry(cf, textvariable=out_dir_var, width=30).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
+        row += 1
 
-        # -- button row: connect, cancel, download
-        btn_row = ttk.Frame(cf)
-        btn_row.grid(row=8, column=0, columnspan=2, pady=6, sticky=tk.EW)
-        def _select_all():
-            for cb in layer_checkboxes:
-                cb[1].set(True)
-        def _clear_all():
-            for cb in layer_checkboxes:
-                cb[1].set(False)
-        ttk.Button(btn_row, text=L("dlg.select_all"), command=_select_all).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_row, text=L("dlg.clear_all"), command=_clear_all).pack(side=tk.LEFT, padx=2)
-        ttk.Label(btn_row, text=L("dlg.policy_name")).pack(side=tk.LEFT, padx=(20, 2))
+        # policy name + action buttons row
+        br = ttk.Frame(cf); br.grid(row=row, column=0, columnspan=2, pady=4, sticky=tk.EW)
+        ttk.Button(br, text=L("dlg.select_all"), command=lambda: [cb[1].set(True) for cb in layer_checkboxes]).pack(side=tk.LEFT, padx=1)
+        ttk.Button(br, text=L("dlg.clear_all"), command=lambda: [cb[1].set(False) for cb in layer_checkboxes]).pack(side=tk.LEFT, padx=1)
+        ttk.Label(br, text=L("dlg.policy_name")).pack(side=tk.LEFT, padx=(10, 2))
         pkg_var = tk.StringVar(value=settings.get("last_policy_name", "fetched_policy"))
-        ttk.Entry(btn_row, textvariable=pkg_var, width=20).pack(side=tk.LEFT, padx=2)
-        # spacer
-        ttk.Label(btn_row, text="").pack(side=tk.LEFT, fill=tk.X, expand=True)
-        connect_btn = ttk.Button(btn_row, text=L("dlg.connect"))
-        connect_btn.pack(side=tk.LEFT, padx=2)
-        download_btn = ttk.Button(btn_row, text=L("dlg.download_btn"), state=tk.DISABLED)
-        download_btn.pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_row, text=L("dlg.cancel"), command=dlg.destroy).pack(side=tk.LEFT, padx=2)
+        ttk.Entry(br, textvariable=pkg_var, width=15).pack(side=tk.LEFT, padx=1)
+        ttk.Label(br, text="").pack(side=tk.LEFT, fill=tk.X, expand=True)
+        connect_btn = ttk.Button(br, text=L("dlg.connect"))
+        connect_btn.pack(side=tk.LEFT, padx=1)
+        download_btn = ttk.Button(br, text=L("dlg.download_btn"), state=tk.DISABLED)
+        download_btn.pack(side=tk.LEFT, padx=1)
+        ttk.Button(br, text=L("dlg.cancel"), command=dlg.destroy).pack(side=tk.LEFT, padx=1)
 
-        # -- layers frame
+        # -- right: progress panel
+        pf_outer = ttk.LabelFrame(top_frame, text=L("dlg.progress"), padding=10)
+        pf_outer.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(10, 0))
+        progress_text = tk.Text(pf_outer, width=40, height=10, wrap=tk.WORD,
+                                state=tk.DISABLED, font=("Consolas", 9))
+        progress_text.pack(fill=tk.BOTH, expand=True)
+        def _log_progress(msg):
+            progress_text.config(state=tk.NORMAL)
+            progress_text.insert(tk.END, f"  {msg}\n")
+            progress_text.see(tk.END)
+            progress_text.config(state=tk.DISABLED)
+            dlg.update()
+
+        # -- middle: layers frame
         lf = ttk.LabelFrame(dlg, text=L("dlg.layers_frame"), padding=10)
-        lf.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        lf.pack(fill=tk.BOTH, expand=True, padx=10, pady=2)
 
         layer_frame = ttk.Frame(lf)
         layer_frame.pack(fill=tk.BOTH, expand=True)
@@ -1341,9 +1360,15 @@ class SearchGUI:
         layer_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         layer_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
+        # -- bottom: big status bar with log
+        status_frame = ttk.LabelFrame(dlg, text=L("dlg.status"), padding=2)
+        status_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+
         status_var = tk.StringVar(value=L("dlg.status_connect"))
-        status_bar = ttk.Label(dlg, textvariable=status_var, relief=tk.SUNKEN, anchor=tk.W)
-        status_bar.pack(fill=tk.X, padx=10, pady=(0, 5))
+        status_label = ttk.Label(status_frame, textvariable=status_var, relief=tk.SUNKEN, anchor=tk.W, font=("", 10))
+        status_label.pack(fill=tk.X)
+        log_label = ttk.Label(status_frame, text="", anchor=tk.W, font=("Consolas", 8), foreground="gray")
+        log_label.pack(fill=tk.X)
 
         layer_checkboxes = []
         _client_ref = [None]
@@ -1359,10 +1384,15 @@ class SearchGUI:
                 "last_output_dir": out_dir_var.get().strip() or "examples",
             })
 
+        def _update_status(msg, log=None):
+            status_var.set(msg)
+            if log:
+                log_label.config(text=log)
+            dlg.update()
+
         def _do_connect():
             connect_btn.config(state=tk.DISABLED)
-            status_var.set(L("dlg.connecting"))
-            dlg.update()
+            _update_status(L("dlg.connecting"))
 
             server = server_var.get().strip()
             username = user_var.get().strip()
@@ -1370,26 +1400,26 @@ class SearchGUI:
             try:
                 port = int(port_var.get().strip())
             except ValueError:
-                status_var.set(L("dlg.invalid_port"))
+                _update_status(L("dlg.invalid_port"))
                 connect_btn.config(state=tk.NORMAL)
                 return
 
             try:
                 timeout = int(timeout_var.get().strip())
             except ValueError:
-                status_var.set(L("dlg.invalid_timeout"))
+                _update_status(L("dlg.invalid_timeout"))
                 connect_btn.config(state=tk.NORMAL)
                 return
 
             try:
                 page_size = int(page_size_var.get().strip())
             except ValueError:
-                status_var.set(L("dlg.invalid_pagesize"))
+                _update_status(L("dlg.invalid_pagesize"))
                 connect_btn.config(state=tk.NORMAL)
                 return
 
             if not server or not username:
-                status_var.set(L("dlg.need_credentials"))
+                _update_status(L("dlg.need_credentials"))
                 connect_btn.config(state=tk.NORMAL)
                 return
 
@@ -1403,19 +1433,23 @@ class SearchGUI:
 
             try:
                 if is_checkpoint:
+                    _log_progress(f"Connecting to {server}:{port} as {username}")
+                    _update_status(L("dlg.connecting"))
                     client = CheckpointAPIClient(server, username, password,
                                                   port=port, verify=ssl_var.get(),
                                                   timeout=timeout, page_size=page_size)
                     _client_ref[0] = client
                     logging.info("Connected to %s as %s (Checkpoint)", server, username)
-                    status_var.set(L("dlg.fetching_layers"))
+                    _log_progress("Connected — fetching layers")
+                    _update_status(L("dlg.fetching_layers"))
                     dlg.update()
                     layer_names = client.fetch_layers()
+                    _log_progress(f"Found {len(layer_names)} layer(s)")
                     for cb in layer_checkboxes:
                         cb[0].destroy()
                     layer_checkboxes.clear()
                     if not layer_names:
-                        status_var.set(L("dlg.no_layers"))
+                        _update_status(L("dlg.no_layers"))
                         connect_btn.config(state=tk.NORMAL)
                         return
                     for ln in layer_names:
@@ -1424,12 +1458,14 @@ class SearchGUI:
                         cb.pack(anchor=tk.W, padx=5, pady=1)
                         layer_checkboxes.append((cb, var))
                     download_btn.config(state=tk.NORMAL)
-                    status_var.set(L("dlg.layers_found", count=len(layer_names)))
+                    _update_status(L("dlg.layers_found", count=len(layer_names)))
                 else:
                     # PA / FortiGate: fetch all directly
                     from fetch_policy import fetch_policy as _fp
+                    _log_progress(f"Fetching policy from {server} ({vendor or 'auto'})")
                     logging.info("Fetching policy from %s (%s)", server, vendor or "auto")
-                    data = _fp(server, port, username, password, vendor=vendor, verify=ssl_var.get(), timeout=timeout, page_size=page_size)
+                    data = _fp(server, port, username, password, vendor=vendor, verify=ssl_var.get(), timeout=timeout, page_size=page_size, package=pkg_var.get().strip() or None)
+                    _log_progress("Policy fetched — saving")
                     ok = _save_and_load_download(data, dlg, status_var)
                     if not ok:
                         connect_btn.config(state=tk.NORMAL)
@@ -1438,7 +1474,8 @@ class SearchGUI:
             except (SystemExit, Exception) as e:
                 msg = str(e).strip() or L("dlg.error_connection")
                 logging.error("Connection error: %s", msg)
-                status_var.set(L("dlg.error_prefix", msg=msg))
+                _log_progress(f"Error: {msg}")
+                _update_status(L("dlg.error_prefix", msg=msg))
                 connect_btn.config(state=tk.NORMAL)
                 return
 
@@ -1483,51 +1520,52 @@ class SearchGUI:
                          [cb[0].cget("text") for cb in layer_checkboxes]) if var.get()]
             pkg_name = pkg_var.get().strip() or "fetched_policy"
 
-            # If no layers checked, use the policy name field as the layer name
             if not selected:
                 if pkg_name and _client_ref[0]:
                     selected = [pkg_name]
                 else:
-                    status_var.set(L("dlg.need_layer"))
+                    _update_status(L("dlg.need_layer"))
                     return
 
             download_btn.config(state=tk.DISABLED)
             connect_btn.config(state=tk.DISABLED)
             client = _client_ref[0]
             if not client:
-                status_var.set(L("dlg.not_connected"))
+                _update_status(L("dlg.not_connected"))
                 return
 
             try:
-                status_var.set(L("dlg.fetch_rules"))
-                dlg.update()
+                _update_status(L("dlg.fetch_rules"))
                 layers_data = []
                 for i, ln in enumerate(selected):
-                    status_var.set(L("dlg.fetch_layer_n", n=i+1, total=len(selected), name=ln))
-                    dlg.update()
+                    _log_progress(f"Layer {i+1}/{len(selected)}: {ln}")
+                    _update_status(L("dlg.fetch_layer_n", n=i+1, total=len(selected), name=ln))
                     logging.info("Fetching rulebase: %s", ln)
-                    rb = client.fetch_rulebase(ln)
+                    rb = client.fetch_rulebase(ln, package=pkg_name)
                     layer = {"name": ln, "uid": rb.get("uid", ""),
                              "rules": [], "inline-layers": []}
                     seen = set()
-                    for item in rb.get("rulebase", []):
-                        t = item.get("type", "")
-                        uid = item.get("uid", "")
-                        if uid in seen:
-                            continue
-                        seen.add(uid)
-                        if t == "access-rule":
-                            layer["rules"].append(item)
-                        elif t == "inline-layer":
-                            layer["inline-layers"].append(item)
-                        elif t == "access-section":
-                            pass
-                        else:
-                            layer["rules"].append(item)
+                    def _extract(items):
+                        for item in items:
+                            t = item.get("type", "")
+                            uid = item.get("uid", "")
+                            if uid in seen:
+                                continue
+                            seen.add(uid)
+                            if t == "access-rule":
+                                layer["rules"].append(item)
+                            elif t == "inline-layer":
+                                _extract(item.get("rulebase", []))
+                                layer["inline-layers"].append(item)
+                            elif t == "access-section":
+                                _extract(item.get("rulebase", []))
+                            else:
+                                layer["rules"].append(item)
+                    _extract(rb.get("rulebase", []))
                     layers_data.append(layer)
 
-                status_var.set(L("dlg.fetch_https"))
-                dlg.update()
+                _log_progress("Fetching HTTPS inspection rules")
+                _update_status(L("dlg.fetch_https"))
                 try:
                     https_rules = client.fetch_https_inspection()
                     logging.info("HTTPS rules: %d", len(https_rules))
@@ -1535,8 +1573,8 @@ class SearchGUI:
                     logging.warning("HTTPS fetch failed: %s", e)
                     https_rules = []
 
-                status_var.set(L("dlg.fetch_threat"))
-                dlg.update()
+                _log_progress("Fetching threat prevention rules")
+                _update_status(L("dlg.fetch_threat"))
                 try:
                     threat_rules = client.fetch_threat_rulebase()
                     logging.info("Threat rules: %d", len(threat_rules))
@@ -1544,11 +1582,12 @@ class SearchGUI:
                     logging.warning("Threat fetch failed: %s", e)
                     threat_rules = []
 
-                status_var.set(L("dlg.fetch_objects"))
-                dlg.update()
+                _log_progress("Fetching objects")
+                _update_status(L("dlg.fetch_objects"))
                 objects = client.fetch_all_objects()
                 total_objs = sum(len(v) for v in objects.values())
                 logging.info("Objects fetched: %d total across %d types", total_objs, len(objects))
+                _log_progress(f"Objects: {total_objs} total")
 
                 data = {
                     "policy-package": {
@@ -1563,6 +1602,7 @@ class SearchGUI:
                     "objects": objects,
                 }
 
+                _log_progress("Saving and loading data")
                 ok = _save_and_load_download(data, dlg, status_var)
                 if not ok:
                     download_btn.config(state=tk.NORMAL)
@@ -1570,6 +1610,7 @@ class SearchGUI:
                     return
                 try:
                     client.logout()
+                    _log_progress("Logged out")
                     logging.info("Logged out from %s", server_var.get().strip())
                 except Exception:
                     pass
@@ -1578,7 +1619,8 @@ class SearchGUI:
             except (SystemExit, Exception) as e:
                 msg = str(e).strip() or L("dlg.error_download")
                 logging.error("Download error: %s", msg)
-                status_var.set(L("dlg.error_prefix", msg=msg))
+                _log_progress(f"Error: {msg}")
+                _update_status(L("dlg.error_prefix", msg=msg))
                 download_btn.config(state=tk.NORMAL)
                 connect_btn.config(state=tk.NORMAL)
                 return
