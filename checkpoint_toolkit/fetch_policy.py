@@ -372,6 +372,14 @@ class CheckpointAPIClient:
                 obj[i] = self.resolve_uids(obj[i])
         return obj
 
+    def rebuild_cache_from_objects(self, objects_dict):
+        """Add any objects from fetch_all_objects output that aren't yet in _cached_objects."""
+        for obj_list in objects_dict.values():
+            for obj in obj_list:
+                uid = obj.get("uid")
+                if uid and uid not in self._cached_objects:
+                    self._cached_objects[uid] = obj
+
     def fetch_all_objects(self):
         objects = {}
         for obj in self._cached_objects.values():
@@ -434,6 +442,7 @@ class CheckpointAPIClient:
                         continue
                     seen.add(uid)
                     if t == "access-rule":
+                        self.resolve_uids(item)
                         layer["rules"].append(item)
                     elif t == "inline-layer":
                         _extract(item.get("rulebase", []))
@@ -441,21 +450,39 @@ class CheckpointAPIClient:
                     elif t == "access-section":
                         _extract(item.get("rulebase", []))
                     else:
+                        self.resolve_uids(item)
                         layer["rules"].append(item)
             _extract(rb.get("rulebase", []))
             access_policy["layers"].append(layer)
 
         print("  Fetching HTTPS inspection policy ...")
         https_rules = self.fetch_https_inspection()
+        for r in https_rules:
+            self.resolve_uids(r)
 
         print("  Fetching threat prevention policy ...")
         threat_rules = self.fetch_threat_rulebase()
+        for r in threat_rules:
+            self.resolve_uids(r)
 
         print("  Fetching NAT policy ...")
         nat_rules = self.fetch_nat_rulebase(package=package)
+        for r in nat_rules:
+            self.resolve_uids(r)
 
         print("  Fetching objects ...")
         objects = self.fetch_all_objects()
+        self.rebuild_cache_from_objects(objects)
+        # Second resolve pass using full object cache
+        for layer in access_policy["layers"]:
+            for rule in layer.get("rules", []):
+                self.resolve_uids(rule)
+        for r in https_rules:
+            self.resolve_uids(r)
+        for r in threat_rules:
+            self.resolve_uids(r)
+        for r in nat_rules:
+            self.resolve_uids(r)
 
         data = {
             "policy-package": {

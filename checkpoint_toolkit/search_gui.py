@@ -1304,7 +1304,7 @@ class SearchGUI:
 
         top_group = ttk.LabelFrame(top_frame, text=L("dlg.connection"), padding=5)
         top_group.pack(fill=tk.BOTH, expand=True)
-        top_group.columnconfigure(0, weight=0)
+        top_group.columnconfigure(0, weight=1)
         top_group.columnconfigure(1, weight=1)
         top_group.rowconfigure(0, weight=1)
 
@@ -1679,11 +1679,59 @@ class SearchGUI:
                 logging.info("Objects fetched: %d total across %d types", total_objs, len(objects))
                 _log_progress(L("dlg.progress.objects_total", count=total_objs))
 
+                # Final UID resolution pass: rebuild cache from organized objects, re-resolve all rules
+                client.rebuild_cache_from_objects(objects)
+                for layer_data in layers_data:
+                    for rule in layer_data.get("rules", []):
+                        client.resolve_uids(rule)
+                for r in nat_rules:
+                    client.resolve_uids(r)
+                for r in https_rules:
+                    client.resolve_uids(r)
+                for r in threat_rules:
+                    client.resolve_uids(r)
+
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
                 base_name = pkg_name
                 out_dir = out_dir_var.get().strip() or self.download_dir
+                if not os.path.exists(out_dir):
+                    os.makedirs(out_dir, exist_ok=True)
 
-                for idx, (ln, layer_data) in enumerate(zip(selected, layers_data)):
+                if len(selected) > 1:
+                    # Multi-layer: save directly without prompting
+                    first = True
+                    for ln, layer_data in zip(selected, layers_data):
+                        safe_ln = re.sub(r'[\\/*?:"<>|]', "_", ln)
+                        save_path = os.path.join(out_dir, f"{safe_ln}_{base_name}_{timestamp}.json")
+                        per_layer_data = {
+                            "policy-package": {
+                                "name": f"{base_name}_{ln}",
+                                "meta-info": {
+                                    "fetched-at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                },
+                                "access-control-policy": {"layers": [layer_data]},
+                                "https-inspection-policy": {"rules": https_rules},
+                                "threat-prevention-policy": {"rulebase": threat_rules},
+                                "nat-policy": {"rules": nat_rules},
+                            },
+                            "objects": objects,
+                        }
+                        with open(save_path, "w", encoding="utf-8") as f:
+                            json.dump(per_layer_data, f, indent=2, default=str)
+                        logging.info("Saved layer %s to %s", ln, save_path)
+                        if first:
+                            first_save = save_path
+                            first = False
+                    _log_progress(L("dlg.progress.saving_loading"))
+                    _stop_spinner()
+                    logging.info("All layers saved, loading %s", first_save)
+                    dlg.destroy()
+                    self._load(first_save)
+                    return
+                else:
+                    # Single layer: prompt save dialog
+                    ln = selected[0]
+                    layer_data = layers_data[0]
                     safe_ln = re.sub(r'[\\/*?:"<>|]', "_", ln)
                     default_name = f"{safe_ln}_{base_name}_{timestamp}.json"
                     per_layer_data = {
@@ -1701,32 +1749,27 @@ class SearchGUI:
                     }
                     status_var.set(L("dlg.saving"))
                     dlg.update()
-                    if idx == 0:
-                        save_path = filedialog.asksaveasfilename(
-                            title=L("dlg.save_title"),
-                            initialdir=os.path.abspath(out_dir),
-                            initialfile=default_name,
-                            defaultextension=".json",
-                            filetypes=[(L("export.filter_json"), "*.json"), (L("export.filter_all"), "*.*")])
-                        if not save_path:
-                            _update_status(L("dlg.save_cancelled"))
-                            download_btn.config(state=tk.NORMAL)
-                            connect_btn.config(state=tk.NORMAL)
-                            _stop_spinner()
-                            return
-                    else:
-                        base, ext = os.path.splitext(save_path)
-                        save_path = f"{base}_{safe_ln}{ext}"
+                    save_path = filedialog.asksaveasfilename(
+                        title=L("dlg.save_title"),
+                        initialdir=os.path.abspath(out_dir),
+                        initialfile=default_name,
+                        defaultextension=".json",
+                        filetypes=[(L("export.filter_json"), "*.json"), (L("export.filter_all"), "*.*")])
+                    if not save_path:
+                        _update_status(L("dlg.save_cancelled"))
+                        download_btn.config(state=tk.NORMAL)
+                        connect_btn.config(state=tk.NORMAL)
+                        _stop_spinner()
+                        return
                     with open(save_path, "w", encoding="utf-8") as f:
                         json.dump(per_layer_data, f, indent=2, default=str)
                     logging.info("Saved layer %s to %s", ln, save_path)
-
-                _log_progress(L("dlg.progress.saving_loading"))
-                _stop_spinner()
-                logging.info("All layers saved, loading %s", save_path)
-                dlg.destroy()
-                self._load(save_path)
-                return
+                    _log_progress(L("dlg.progress.saving_loading"))
+                    _stop_spinner()
+                    logging.info("All layers saved, loading %s", save_path)
+                    dlg.destroy()
+                    self._load(save_path)
+                    return
 
             except (SystemExit, Exception) as e:
                 _stop_spinner()
