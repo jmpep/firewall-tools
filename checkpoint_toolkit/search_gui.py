@@ -1617,6 +1617,7 @@ class SearchGUI:
                                 continue
                             seen.add(uid)
                             if t == "access-rule":
+                                client.resolve_uids(item)
                                 layer["rules"].append(item)
                             elif t == "inline-layer":
                                 _extract(item.get("rulebase", []))
@@ -1624,6 +1625,7 @@ class SearchGUI:
                             elif t == "access-section":
                                 _extract(item.get("rulebase", []))
                             else:
+                                client.resolve_uids(item)
                                 layer["rules"].append(item)
                     _extract(rb.get("rulebase", []))
                     layers_data.append(layer)
@@ -1632,6 +1634,8 @@ class SearchGUI:
                 _update_status(L("dlg.fetch_https"))
                 try:
                     https_rules = client.fetch_https_inspection()
+                    for r in https_rules:
+                        client.resolve_uids(r)
                     logging.info("HTTPS rules: %d", len(https_rules))
                 except Exception as e:
                     logging.warning("HTTPS fetch failed: %s", e)
@@ -1641,6 +1645,8 @@ class SearchGUI:
                 _update_status(L("dlg.fetch_threat"))
                 try:
                     threat_rules = client.fetch_threat_rulebase()
+                    for r in threat_rules:
+                        client.resolve_uids(r)
                     logging.info("Threat rules: %d", len(threat_rules))
                 except Exception as e:
                     logging.warning("Threat fetch failed: %s", e)
@@ -1658,6 +1664,7 @@ class SearchGUI:
                             if t == "nat-section":
                                 _extract_nat(item.get("rulebase", []))
                             else:
+                                client.resolve_uids(item)
                                 flat_nat.append(item)
                     _extract_nat(raw_nat)
                     nat_rules = flat_nat
@@ -1672,33 +1679,53 @@ class SearchGUI:
                 logging.info("Objects fetched: %d total across %d types", total_objs, len(objects))
                 _log_progress(L("dlg.progress.objects_total", count=total_objs))
 
-                data = {
-                    "policy-package": {
-                        "name": pkg_name,
-                        "meta-info": {
-                            "fetched-at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                base_name = pkg_name
+                out_dir = out_dir_var.get().strip() or self.download_dir
+
+                for idx, (ln, layer_data) in enumerate(zip(selected, layers_data)):
+                    safe_ln = re.sub(r'[\\/*?:"<>|]', "_", ln)
+                    default_name = f"{safe_ln}_{base_name}_{timestamp}.json"
+                    per_layer_data = {
+                        "policy-package": {
+                            "name": f"{base_name}_{ln}",
+                            "meta-info": {
+                                "fetched-at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                            },
+                            "access-control-policy": {"layers": [layer_data]},
+                            "https-inspection-policy": {"rules": https_rules},
+                            "threat-prevention-policy": {"rulebase": threat_rules},
+                            "nat-policy": {"rules": nat_rules},
                         },
-                        "access-control-policy": {"layers": layers_data},
-                        "https-inspection-policy": {"rules": https_rules},
-                        "threat-prevention-policy": {"rulebase": threat_rules},
-                        "nat-policy": {"rules": nat_rules},
-                    },
-                    "objects": objects,
-                }
+                        "objects": objects,
+                    }
+                    status_var.set(L("dlg.saving"))
+                    dlg.update()
+                    if idx == 0:
+                        save_path = filedialog.asksaveasfilename(
+                            title=L("dlg.save_title"),
+                            initialdir=os.path.abspath(out_dir),
+                            initialfile=default_name,
+                            defaultextension=".json",
+                            filetypes=[(L("export.filter_json"), "*.json"), (L("export.filter_all"), "*.*")])
+                        if not save_path:
+                            _update_status(L("dlg.save_cancelled"))
+                            download_btn.config(state=tk.NORMAL)
+                            connect_btn.config(state=tk.NORMAL)
+                            _stop_spinner()
+                            return
+                    else:
+                        base, ext = os.path.splitext(save_path)
+                        save_path = f"{base}_{safe_ln}{ext}"
+                    with open(save_path, "w", encoding="utf-8") as f:
+                        json.dump(per_layer_data, f, indent=2, default=str)
+                    logging.info("Saved layer %s to %s", ln, save_path)
 
                 _log_progress(L("dlg.progress.saving_loading"))
                 _stop_spinner()
-                ok = _save_and_load_download(data, dlg, status_var)
-                if not ok:
-                    download_btn.config(state=tk.NORMAL)
-                    connect_btn.config(state=tk.NORMAL)
-                    return
-                try:
-                    client.logout()
-                    _log_progress(L("dlg.progress.logged_out"))
-                    logging.info("Logged out from %s", server_var.get().strip())
-                except Exception:
-                    pass
+                logging.info("All layers saved, loading %s", save_path)
+                dlg.destroy()
+                self._load(save_path)
                 return
 
             except (SystemExit, Exception) as e:

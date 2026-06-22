@@ -358,6 +358,20 @@ class CheckpointAPIClient:
             print(f"  Warning: {show_cmd} failed ({e})")
             return []
 
+    def resolve_uids(self, obj):
+        """Recursively replace UID-only references with names from cached objects-dictionary."""
+        if isinstance(obj, dict):
+            if "uid" in obj and "name" not in obj:
+                cached = self._cached_objects.get(obj["uid"])
+                if cached:
+                    obj["name"] = cached.get("name", "")
+            for key in list(obj.keys()):
+                obj[key] = self.resolve_uids(obj[key])
+        elif isinstance(obj, list):
+            for i in range(len(obj)):
+                obj[i] = self.resolve_uids(obj[i])
+        return obj
+
     def fetch_all_objects(self):
         objects = {}
         for obj in self._cached_objects.values():
