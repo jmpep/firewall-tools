@@ -1,0 +1,73 @@
+Management Server
+        |
+        | HTTPS API
+        |
+Python
+ ├── login()
+ ├── show-packages()
+ ├── show-access-rulebase()
+ ├── show-nat-rulebase()
+ ├── show-object()
+ └── logout()
+
+A practical solution is usually split into 3 scripts (or one script with subcommands):
+
+list_packages.py
+Login to Management Server
+List all policy packages
+List access policies and layers
+download_package.py
+Download a specific package
+Download all packages
+Export to JSON
+policy_objects.py
+Download a policy package
+Extract all UIDs referenced by:
+Access rules
+NAT rules
+Threat rules
+Inline layers
+Groups
+Download all corresponding objects
+Produce:
+policy.json
+objects.json
+Verify every UID in policy exists in objects
+
+python cp_export.py \
+    --server 10.10.10.1 \
+    --user apiuser \
+    --password secret \
+    --list-packages
+
+python cp_export.py \
+    --server 10.10.10.1 \
+    --user apiuser \
+    --password secret \
+    --download-all
+
+python cp_export.py \
+    --server 10.10.10.1 \
+    --user apiuser \
+    --password secret \
+    --package "Datacenter"
+
+python cp_export.py \
+    --server 10.10.10.1 \
+    --user apiuser \
+    --password secret \
+    --objects-from-policy "Datacenter"
+
+For a production-grade version, I would also add:
+
+Multi-Domain Server (MDS) support
+Automatic pagination
+Recursive inline layer traversal
+Access + NAT + Threat Prevention policies
+Parallel object downloads (10–20× faster)
+CSV exports for rule analysis
+Checkpoint R80.x through R82 compatibility
+Resume capability for very large environments (100k+ objects)
+
+These additions are important because large Check Point deployments often contain tens of thousands of
+
