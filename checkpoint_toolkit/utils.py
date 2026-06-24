@@ -1,5 +1,7 @@
 """Settings persistence (JSON-as-YAML) and logging for the firewall toolkit."""
 
+__version__ = "1.1.0"
+
 import json
 import logging
 import os

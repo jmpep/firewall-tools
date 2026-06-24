@@ -1,6 +1,8 @@
 """Collect routing tables from Checkpoint GAIA, Checkpoint VSX, FortiGate,
 Palo Alto firewalls via their respective APIs. No external dependencies."""
 
+__version__ = "1.1.0"
+
 import json
 import sys
 import os

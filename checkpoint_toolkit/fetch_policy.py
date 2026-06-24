@@ -1,5 +1,7 @@
 """Fetch firewall policy from Checkpoint, Palo Alto, or Fortinet API and save as JSON."""
 
+__version__ = "1.1.0"
+
 import json
 import sys
 import os
@@ -9,6 +11,7 @@ import ssl
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 VENDORS = ("checkpoint", "paloalto", "fortinet")
 
@@ -358,27 +361,67 @@ class CheckpointAPIClient:
             print(f"  Warning: {show_cmd} failed ({e})")
             return []
 
-    def resolve_uids(self, obj):
-        """Recursively replace UID-only references with names from cached objects-dictionary."""
-        if isinstance(obj, dict):
-            if "uid" in obj and "name" not in obj:
-                cached = self._cached_objects.get(obj["uid"])
-                if cached:
-                    obj["name"] = cached.get("name", "")
-            for key in list(obj.keys()):
-                obj[key] = self.resolve_uids(obj[key])
-        elif isinstance(obj, list):
-            for i in range(len(obj)):
-                obj[i] = self.resolve_uids(obj[i])
-        return obj
+    def collect_uids(self, node, uid_set):
+        """Recursively collect all UIDs from a nested structure of dicts and lists."""
+        if isinstance(node, dict):
+            uid = node.get("uid")
+            if uid:
+                uid_set.add(uid)
+            for value in node.values():
+                self.collect_uids(value, uid_set)
+        elif isinstance(node, list):
+            for item in node:
+                self.collect_uids(item, uid_set)
 
-    def rebuild_cache_from_objects(self, objects_dict):
-        """Add any objects from fetch_all_objects output that aren't yet in _cached_objects."""
-        for obj_list in objects_dict.values():
-            for obj in obj_list:
-                uid = obj.get("uid")
-                if uid and uid not in self._cached_objects:
+    def _resolve_missing_uids(self, uid_list):
+        """Fetch any UIDs not yet in cache via show-object API (parallel)."""
+        if not uid_list:
+            return
+        print(f"  Resolving {len(uid_list)} missing UIDs via show-object ...")
+        def _fetch(uid):
+            try:
+                obj = self._post("show-object", {"uid": uid, "details-level": "full"})
+                if obj and "uid" in obj and "name" in obj:
+                    return uid, obj
+            except Exception:
+                pass
+            return uid, None
+        with ThreadPoolExecutor(max_workers=20) as pool:
+            futures = {pool.submit(_fetch, uid): uid for uid in uid_list}
+            for f in as_completed(futures):
+                uid, obj = f.result()
+                if obj:
                     self._cached_objects[uid] = obj
+        resolved = sum(1 for uid in uid_list if uid in self._cached_objects)
+        if resolved < len(uid_list):
+            print(f"  Warning: {len(uid_list) - resolved} UIDs could not be resolved")
+
+    def resolve_all_uids(self, rules_structure):
+        """Two-phase UID resolution: collect all UIDs, fetch missing, replace refs."""
+        uid_set = set()
+        self.collect_uids(rules_structure, uid_set)
+        missing = [uid for uid in uid_set if uid not in self._cached_objects]
+        if missing:
+            self._resolve_missing_uids(missing)
+        self._replace_uid_refs(rules_structure)
+
+    def _replace_uid_refs(self, node):
+        """Walk structure replacing UID-only refs with {name, uid} dicts."""
+        if isinstance(node, dict):
+            if "uid" in node and "name" not in node:
+                cached = self._cached_objects.get(node["uid"])
+                if cached:
+                    node["name"] = cached.get("name", "")
+            for key in list(node.keys()):
+                node[key] = self._replace_uid_refs(node[key])
+        elif isinstance(node, list):
+            for i in range(len(node)):
+                if isinstance(node[i], str) and node[i] in self._cached_objects:
+                    cached = self._cached_objects[node[i]]
+                    node[i] = {"uid": node[i], "name": cached.get("name", "")}
+                else:
+                    node[i] = self._replace_uid_refs(node[i])
+        return node
 
     def fetch_all_objects(self):
         objects = {}
@@ -442,7 +485,6 @@ class CheckpointAPIClient:
                         continue
                     seen.add(uid)
                     if t == "access-rule":
-                        self.resolve_uids(item)
                         layer["rules"].append(item)
                     elif t == "inline-layer":
                         _extract(item.get("rulebase", []))
@@ -450,39 +492,29 @@ class CheckpointAPIClient:
                     elif t == "access-section":
                         _extract(item.get("rulebase", []))
                     else:
-                        self.resolve_uids(item)
                         layer["rules"].append(item)
             _extract(rb.get("rulebase", []))
             access_policy["layers"].append(layer)
 
         print("  Fetching HTTPS inspection policy ...")
         https_rules = self.fetch_https_inspection()
-        for r in https_rules:
-            self.resolve_uids(r)
 
         print("  Fetching threat prevention policy ...")
         threat_rules = self.fetch_threat_rulebase()
-        for r in threat_rules:
-            self.resolve_uids(r)
 
         print("  Fetching NAT policy ...")
         nat_rules = self.fetch_nat_rulebase(package=package)
-        for r in nat_rules:
-            self.resolve_uids(r)
 
         print("  Fetching objects ...")
         objects = self.fetch_all_objects()
-        self.rebuild_cache_from_objects(objects)
-        # Second resolve pass using full object cache
-        for layer in access_policy["layers"]:
-            for rule in layer.get("rules", []):
-                self.resolve_uids(rule)
-        for r in https_rules:
-            self.resolve_uids(r)
-        for r in threat_rules:
-            self.resolve_uids(r)
-        for r in nat_rules:
-            self.resolve_uids(r)
+
+        # Single UID resolution pass over the entire assembled structure
+        self.resolve_all_uids({
+            "layers": access_policy["layers"],
+            "https_rules": https_rules,
+            "threat_rules": threat_rules,
+            "nat_rules": nat_rules,
+        })
 
         data = {
             "policy-package": {

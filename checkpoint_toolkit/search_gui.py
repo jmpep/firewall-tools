@@ -1,5 +1,7 @@
 """GUI to search Checkpoint policy JSON — objects, rules, NAT.  Export to CSV."""
 
+__version__ = "1.1.0"
+
 import json
 import re
 import sys
@@ -425,7 +427,7 @@ class SearchGUI:
                  "service", "service-ports",
                   "action", "track", "comments",
                   "hits", "creation-time", "last-modified")
-    OBJ_COLS = ("name", "ip-address", "ipv4-address", "subnet", "mask-length",
+    OBJ_COLS = ("name", "uid", "ip-address", "ipv4-address", "subnet", "mask-length",
                 "type", "comments", "category", "risk", "_objtype")
 
     def __init__(self, root, initial_file=None):
@@ -484,7 +486,7 @@ class SearchGUI:
         self._lang_btns = {}
         img_dir = os.path.join(os.path.dirname(__file__), "images")
         self._flag_images = {}
-        for code in ("en", "fr", "de", "it", "sk"):
+        for code in ("en", "fr", "de", "it", "sk", "sr"):
             btn = tk.Button(toolbar, text=code.upper(), width=4,
                             command=lambda c=code: self._select_language(c), padx=0, pady=0)
             btn.pack(side=tk.RIGHT, padx=1)
@@ -647,7 +649,7 @@ class SearchGUI:
             if isinstance(v, (int, float)):
                 return str(v)
             return v if v else ''
-        fields = [_fmt(o.get(k)) for k in ('name', 'ip-address', 'ipv4-address',
+        fields = [_fmt(o.get(k)) for k in ('name', 'uid', 'ip-address', 'ipv4-address',
                                             'subnet', 'comments', 'category', '_objtype')]
         return any(match_pattern(f, term) for f in fields)
 
@@ -1299,14 +1301,12 @@ class SearchGUI:
         dlg.geometry("1000x700")
 
         # ================================================================= top half: fields (left) + progress (right)
-        top_frame = ttk.Frame(dlg)
-        top_frame.pack(fill=tk.BOTH, expand=False, padx=10, pady=5)
-
-        top_group = ttk.LabelFrame(top_frame, text=L("dlg.connection"), padding=5)
-        top_group.pack(fill=tk.BOTH, expand=True)
-        top_group.columnconfigure(0, weight=1)
+        top_group = ttk.LabelFrame(dlg, text=L("dlg.connection"), padding=5)
+        top_group.pack(fill=tk.BOTH, expand=False, padx=10, pady=5)
+        top_group.columnconfigure(0, weight=0)
         top_group.columnconfigure(1, weight=1)
         top_group.rowconfigure(0, weight=1)
+        top_group.rowconfigure(1, weight=0)
 
         # -- left: connection fields
         cf = ttk.Frame(top_group)
@@ -1316,17 +1316,17 @@ class SearchGUI:
         row = 0
         ttk.Label(cf, text=L("dlg.server")).grid(row=row, column=0, sticky=tk.W, pady=1)
         server_var = tk.StringVar(value=settings.get("last_server") or "192.168.1.1")
-        ttk.Entry(cf, textvariable=server_var, width=30).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
+        ttk.Entry(cf, textvariable=server_var, width=50).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
         row += 1
 
         ttk.Label(cf, text=L("dlg.username")).grid(row=row, column=0, sticky=tk.W, pady=1)
         user_var = tk.StringVar(value=settings.get("last_username") or "admin")
-        ttk.Entry(cf, textvariable=user_var, width=30).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
+        ttk.Entry(cf, textvariable=user_var, width=50).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
         row += 1
 
         ttk.Label(cf, text=L("dlg.password")).grid(row=row, column=0, sticky=tk.W, pady=1)
         pass_var = tk.StringVar()
-        ttk.Entry(cf, textvariable=pass_var, width=30, show="*").grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
+        ttk.Entry(cf, textvariable=pass_var, width=50, show="*").grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
         row += 1
 
         ttk.Label(cf, text=L("dlg.port")).grid(row=row, column=0, sticky=tk.W, pady=1)
@@ -1357,35 +1357,36 @@ class SearchGUI:
 
         ttk.Label(cf, text=L("dlg.output_dir")).grid(row=row, column=0, sticky=tk.W, pady=1)
         out_dir_var = tk.StringVar(value=settings.get("last_output_dir", self.download_dir))
-        ttk.Entry(cf, textvariable=out_dir_var).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
+        ttk.Entry(cf, textvariable=out_dir_var, width=50).grid(row=row, column=1, padx=4, pady=1, sticky=tk.EW)
         row += 1
 
-        # policy name + action buttons row
-        br = ttk.Frame(cf); br.grid(row=row, column=0, columnspan=2, pady=4, sticky=tk.EW)
-        ttk.Button(br, text=L("dlg.select_all"), command=lambda: [cb[1].set(True) for cb in layer_checkboxes]).pack(side=tk.LEFT, padx=1)
-        ttk.Button(br, text=L("dlg.clear_all"), command=lambda: [cb[1].set(False) for cb in layer_checkboxes]).pack(side=tk.LEFT, padx=1)
-        ttk.Label(br, text=L("dlg.policy_name")).pack(side=tk.LEFT, padx=(10, 2))
+        # policy name row (inside fields column)
+        pkr = ttk.Frame(cf); pkr.grid(row=row, column=0, columnspan=2, pady=2, sticky=tk.EW)
+        ttk.Label(pkr, text=L("dlg.policy_name")).pack(side=tk.LEFT, padx=(0, 4))
         pkg_var = tk.StringVar(value=settings.get("last_policy_name", "fetched_policy"))
-        ttk.Entry(br, textvariable=pkg_var, width=15).pack(side=tk.LEFT, padx=1)
-        ttk.Label(br, text="").pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Entry(pkr, textvariable=pkg_var, width=50).pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # -- right: progress panel (inside same LabelFrame, more space)
+        pf_outer = ttk.Frame(top_group)
+        pf_outer.grid(row=0, column=1, sticky=tk.NSEW)
+        pf_outer.rowconfigure(0, weight=1)
+        pf_outer.columnconfigure(0, weight=1)
+
+        progress_text = tk.Text(pf_outer, wrap=tk.WORD, state=tk.DISABLED,
+                                font=("Consolas", 9), height=8)
+        progress_text.grid(row=0, column=0, sticky=tk.NSEW)
+
+        progress_bar = ttk.Progressbar(pf_outer, mode='indeterminate')
+        progress_bar.grid(row=1, column=0, sticky=tk.EW, pady=(2, 0))
+
+        # -- buttons row below fields + progress
+        br = ttk.Frame(top_group); br.grid(row=1, column=0, columnspan=2, pady=4, sticky=tk.EW)
         connect_btn = ttk.Button(br, text=L("dlg.connect"))
         connect_btn.pack(side=tk.LEFT, padx=1)
         download_btn = ttk.Button(br, text=L("dlg.download_btn"), state=tk.DISABLED)
         download_btn.pack(side=tk.LEFT, padx=1)
         ttk.Button(br, text=L("dlg.cancel"), command=dlg.destroy).pack(side=tk.LEFT, padx=1)
-
-        # -- right: progress panel
-        pf_outer = ttk.LabelFrame(top_group, text=L("dlg.progress"), padding=5)
-        pf_outer.grid(row=0, column=1, sticky=tk.NSEW)
-        pf_outer.rowconfigure(0, weight=1)
-        pf_outer.columnconfigure(0, weight=1)
-
-        progress_text = tk.Text(pf_outer, width=48, height=14, wrap=tk.WORD,
-                                state=tk.DISABLED, font=("Consolas", 9))
-        progress_text.grid(row=0, column=0, sticky=tk.NSEW)
-
-        progress_bar = ttk.Progressbar(pf_outer, mode='indeterminate', length=120)
-        progress_bar.grid(row=1, column=0, sticky=tk.EW, pady=(2, 0))
+        ttk.Label(br, text="").pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         def _start_spinner():
             progress_bar.start(10)
@@ -1403,9 +1404,19 @@ class SearchGUI:
         # -- middle: layers frame
         lf = ttk.LabelFrame(dlg, text=L("dlg.layers_frame"), padding=10)
         lf.pack(fill=tk.BOTH, expand=True, padx=10, pady=2)
+        lf.columnconfigure(0, weight=1)
+
+        select_all_var = tk.BooleanVar(value=True)
+        def _toggle_select_all():
+            val = select_all_var.get()
+            for cb in layer_checkboxes:
+                cb[1].set(val)
+        ttk.Checkbutton(lf, text=L("dlg.select_all"), variable=select_all_var,
+                        command=_toggle_select_all).grid(row=0, column=0, sticky=tk.W, pady=(0, 4))
 
         layer_frame = ttk.Frame(lf)
-        layer_frame.pack(fill=tk.BOTH, expand=True)
+        layer_frame.grid(row=1, column=0, sticky=tk.NSEW)
+        lf.rowconfigure(1, weight=1)
         layer_canvas = tk.Canvas(layer_frame, borderwidth=0, highlightthickness=0)
         layer_scroll = ttk.Scrollbar(layer_frame, orient=tk.VERTICAL, command=layer_canvas.yview)
         layer_inner = ttk.Frame(layer_canvas)
@@ -1617,7 +1628,6 @@ class SearchGUI:
                                 continue
                             seen.add(uid)
                             if t == "access-rule":
-                                client.resolve_uids(item)
                                 layer["rules"].append(item)
                             elif t == "inline-layer":
                                 _extract(item.get("rulebase", []))
@@ -1625,7 +1635,6 @@ class SearchGUI:
                             elif t == "access-section":
                                 _extract(item.get("rulebase", []))
                             else:
-                                client.resolve_uids(item)
                                 layer["rules"].append(item)
                     _extract(rb.get("rulebase", []))
                     layers_data.append(layer)
@@ -1634,8 +1643,6 @@ class SearchGUI:
                 _update_status(L("dlg.fetch_https"))
                 try:
                     https_rules = client.fetch_https_inspection()
-                    for r in https_rules:
-                        client.resolve_uids(r)
                     logging.info("HTTPS rules: %d", len(https_rules))
                 except Exception as e:
                     logging.warning("HTTPS fetch failed: %s", e)
@@ -1645,8 +1652,6 @@ class SearchGUI:
                 _update_status(L("dlg.fetch_threat"))
                 try:
                     threat_rules = client.fetch_threat_rulebase()
-                    for r in threat_rules:
-                        client.resolve_uids(r)
                     logging.info("Threat rules: %d", len(threat_rules))
                 except Exception as e:
                     logging.warning("Threat fetch failed: %s", e)
@@ -1664,7 +1669,6 @@ class SearchGUI:
                             if t == "nat-section":
                                 _extract_nat(item.get("rulebase", []))
                             else:
-                                client.resolve_uids(item)
                                 flat_nat.append(item)
                     _extract_nat(raw_nat)
                     nat_rules = flat_nat
@@ -1679,17 +1683,14 @@ class SearchGUI:
                 logging.info("Objects fetched: %d total across %d types", total_objs, len(objects))
                 _log_progress(L("dlg.progress.objects_total", count=total_objs))
 
-                # Final UID resolution pass: rebuild cache from organized objects, re-resolve all rules
-                client.rebuild_cache_from_objects(objects)
-                for layer_data in layers_data:
-                    for rule in layer_data.get("rules", []):
-                        client.resolve_uids(rule)
-                for r in nat_rules:
-                    client.resolve_uids(r)
-                for r in https_rules:
-                    client.resolve_uids(r)
-                for r in threat_rules:
-                    client.resolve_uids(r)
+                # Single UID resolution pass over the entire assembled structure
+                assembled = {
+                    "layers": layers_data,
+                    "https_rules": https_rules,
+                    "threat_rules": threat_rules,
+                    "nat_rules": nat_rules,
+                }
+                client.resolve_all_uids(assembled)
 
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
                 base_name = pkg_name
