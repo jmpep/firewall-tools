@@ -1,3 +1,5 @@
+pip install cp_mgmt_api_python_sdk
+
 Management Server
         |
         | HTTPS API
@@ -9,6 +11,14 @@ Python
  ├── show-nat-rulebase()
  ├── show-object()
  └── logout()
+
+export/
+|
+├── package.json
+├── policy.json
+├── objects.json
+├── missing_uids.txt
+└── summary.json
 
 A practical solution is usually split into 3 scripts (or one script with subcommands):
 
@@ -71,3 +81,471 @@ Resume capability for very large environments (100k+ objects)
 
 These additions are important because large Check Point deployments often contain tens of thousands of
 
+Main login module
+--------------------
+import requests
+import json
+
+class CheckpointAPI:
+
+    def __init__(self, server, user, password):
+        self.server = server
+        self.base = f"https://{server}/web_api"
+        self.sid = None
+
+        payload = {
+            "user": user,
+            "password": password
+        }
+
+        r = requests.post(
+            f"{self.base}/login",
+            json=payload,
+            verify=False
+        )
+
+        r.raise_for_status()
+
+        self.sid = r.json()["sid"]
+
+        self.headers = {
+            "X-chkp-sid": self.sid
+        }
+
+    def api_call(self, command, payload=None):
+
+        if payload is None:
+            payload = {}
+
+        r = requests.post(
+            f"{self.base}/{command}",
+            json=payload,
+            headers=self.headers,
+            verify=False
+        )
+
+        r.raise_for_status()
+
+        return r.json()
+
+    def logout(self):
+        self.api_call("logout")
+
+----------------------
+List all packages
+packages = api.api_call("show-packages")
+
+for pkg in packages["packages"]:
+    print(pkg["name"])
+
+--------------------------
+Download all packages
+packages = api.api_call("show-packages")
+
+for pkg in packages["packages"]:
+
+    details = api.api_call(
+        "show-package",
+        {
+            "name": pkg["name"]
+        }
+    )
+
+    with open(f"{pkg['name']}.json", "w") as f:
+        json.dump(details, f, indent=2)
+----------------------------
+Download one package
+package = api.api_call(
+    "show-package",
+    {
+        "name": package_name
+    }
+)
+------------------
+Download access rulebase
+rulebase = api.api_call(
+    "show-access-rulebase",
+    {
+        "name": layer_name,
+        "details-level": "full",
+        "limit": 500
+    }
+)
+----------------------
+For large policies you must paginate.
+offset = 0
+
+while True:
+
+    data = api.api_call(
+        "show-access-rulebase",
+        {
+            "name": layer,
+            "offset": offset,
+            "limit": 500,
+            "details-level": "full"
+        }
+    )
+
+    rules.extend(data["rulebase"])
+
+    if len(data["rulebase"]) < 500:
+        break
+
+    offset += 500
+-----------------------------
+Collect all referenced UIDs
+uids = set()
+
+def collect(value):
+
+    if isinstance(value, dict):
+
+        if "uid" in value:
+            uids.add(value["uid"])
+
+        for v in value.values():
+            collect(v)
+
+    elif isinstance(value, list):
+
+        for v in value:
+            collect(v)
+
+collect(rulebase)
+--------------------------------
+Download all objects
+objects = {}
+
+for uid in uids:
+
+    try:
+        obj = api.api_call(
+            "show-object",
+            {
+                "uid": uid,
+                "details-level": "full"
+            }
+        )
+
+        objects[uid] = obj
+
+    except Exception as e:
+        print(f"Failed {uid}")
+---------------------
+Verify policy/object consistency
+missing = []
+
+for uid in uids:
+
+    if uid not in objects:
+        missing.append(uid)
+
+if missing:
+
+    print("Missing UIDs")
+
+    for uid in missing:
+        print(uid)
+
+else:
+    print("All UIDs resolved")
+
+-----------------------------------------------
+Using SDK
+from cpapi import APIClient
+from cpapi import APIClientArgs
+
+client = APIClient(APIClientArgs(server="10.0.0.1"))
+
+client.login(
+    "apiuser",
+    "password"
+)
+
+result = client.api_call(
+    "show-packages",
+    {}
+)
+
+print(result.data)
+
+----------------------------------import json
+import csv
+import logging
+import argparse
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+
+import requests
+--------------------------------------
+import requests
+import urllib3
+
+urllib3.disable_warnings()
+
+class CheckPointAPI:
+
+    def __init__(self, server, user, password):
+
+        self.base = f"https://{server}/web_api"
+
+        r = requests.post(
+            f"{self.base}/login",
+            json={
+                "user": user,
+                "password": password
+            },
+            verify=False,
+            timeout=60
+        )
+
+        r.raise_for_status()
+
+        self.sid = r.json()["sid"]
+
+        self.headers = {
+            "X-chkp-sid": self.sid
+        }
+
+    def call(self, command, payload=None):
+
+        if payload is None:
+            payload = {}
+
+        r = requests.post(
+            f"{self.base}/{command}",
+            headers=self.headers,
+            json=payload,
+            verify=False,
+            timeout=300
+        )
+
+        r.raise_for_status()
+
+        return r.json()
+
+    def logout(self):
+        self.call("logout")
+-------------------------------------
+def paged_api(api, command, payload, key):
+
+    offset = 0
+    limit = 500
+
+    results = []
+
+    while True:
+
+        p = payload.copy()
+
+        p["offset"] = offset
+        p["limit"] = limit
+
+        data = api.call(command, p)
+
+        chunk = data.get(key, [])
+
+        results.extend(chunk)
+
+        if len(chunk) < limit:
+            break
+
+        offset += limit
+
+    return results
+---------------------------------
+Get all packages
+def get_all_packages(api):
+
+    data = api.call(
+        "show-packages",
+        {
+            "details-level": "full"
+        }
+    )
+
+    return data["packages"]
+Export one package
+def export_package(api, package_name):
+
+    return api.call(
+        "show-package",
+        {
+            "name": package_name
+        }
+    )
+Export all packages
+def export_all_packages(api):
+
+    result = {}
+
+    for pkg in get_all_packages(api):
+
+        name = pkg["name"]
+
+        result[name] = export_package(
+            api,
+            name
+        )
+
+    return result
+Export access rulebase with pagination
+def get_access_rulebase(
+    api,
+    layer_name
+):
+
+    return paged_api(
+        api,
+        "show-access-rulebase",
+        {
+            "name": layer_name,
+            "details-level": "uid"
+        },
+        "rulebase"
+    )
+Export NAT rulebase
+def get_nat_rulebase(
+    api,
+    package_name
+):
+
+    return paged_api(
+        api,
+        "show-nat-rulebase",
+        {
+            "package": package_name,
+            "details-level": "uid"
+        },
+        "rulebase"
+    )
+Collect all UIDs recursively
+
+This is the critical part.
+
+def collect_uids(node, uid_set):
+
+    if isinstance(node, dict):
+
+        uid = node.get("uid")
+
+        if uid:
+            uid_set.add(uid)
+
+        for value in node.values():
+            collect_uids(value, uid_set)
+
+    elif isinstance(node, list):
+
+        for item in node:
+            collect_uids(item, uid_set)
+
+Usage:
+
+uids = set()
+
+collect_uids(policy_json, uids)
+Download objects in parallel
+
+For large environments.
+
+from concurrent.futures import ThreadPoolExecutor
+def fetch_object(api, uid):
+
+    try:
+
+        obj = api.call(
+            "show-object",
+            {
+                "uid": uid,
+                "details-level": "full"
+            }
+        )
+
+        return uid, obj
+
+    except Exception as e:
+
+        return uid, {
+            "error": str(e)
+        }
+def download_objects(api, uid_set):
+
+    objects = {}
+
+    with ThreadPoolExecutor(
+        max_workers=20
+    ) as pool:
+
+        futures = []
+
+        for uid in uid_set:
+
+            futures.append(
+                pool.submit(
+                    fetch_object,
+                    api,
+                    uid
+                )
+            )
+
+        for f in futures:
+
+            uid, obj = f.result()
+
+            objects[uid] = obj
+
+    return objects
+Verify consistency
+def verify_uids(
+    uid_set,
+    object_db
+):
+
+    missing = []
+
+    for uid in uid_set:
+
+        if uid not in object_db:
+
+            missing.append(uid)
+
+    return missing
+Export policy + objects
+def export_policy_objects(
+    api,
+    package_name
+):
+
+    package = export_package(
+        api,
+        package_name
+    )
+
+    uids = set()
+
+    collect_uids(
+        package,
+        uids
+    )
+
+    objects = download_objects(
+        api,
+        uids
+    )
+
+    missing = verify_uids(
+        uids,
+        objects
+    )
+
+    return {
+
+        "package": package,
+
+        "objects": objects,
+
+        "missing_uids": missing
+    }
+-------------------------
